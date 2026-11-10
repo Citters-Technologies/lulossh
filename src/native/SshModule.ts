@@ -1,4 +1,4 @@
-import {NativeEventEmitter, NativeModules} from 'react-native';
+import { NativeEventEmitter, NativeModules } from 'react-native';
 
 /**
  * Contrato único del módulo SSH. Cada plataforma lo implementa en nativo:
@@ -8,8 +8,8 @@ import {NativeEventEmitter, NativeModules} from 'react-native';
  */
 
 export type AuthMethod =
-  | {type: 'password'; password: string}
-  | {type: 'privateKey'; keyId: string; passphrase?: string};
+  | { type: 'password'; password: string }
+  | { type: 'privateKey'; keyId: string; passphrase?: string };
 
 export interface ConnectOptions {
   host: string;
@@ -26,11 +26,11 @@ export interface ConnectOptions {
 
 export interface SshSessionEvents {
   /** Datos de la shell en base64 (los bytes pueden no ser UTF-8 válido). */
-  data: {sessionId: string; base64: string};
-  closed: {sessionId: string; reason?: string};
+  data: { sessionId: string; base64: string };
+  closed: { sessionId: string; reason?: string };
   /** El host es nuevo o su huella cambió: la UI debe pedir confirmación. */
-  hostKey: {sessionId: string; fingerprint: string; changed: boolean};
-  error: {sessionId: string; message: string};
+  hostKey: { sessionId: string; fingerprint: string; changed: boolean };
+  error: { sessionId: string; message: string };
 }
 
 export interface SshModuleSpec {
@@ -51,11 +51,20 @@ if (!native) {
 }
 
 export const Ssh = native as SshModuleSpec;
-export const sshEvents = new NativeEventEmitter(NativeModules.LuloSsh);
+type Listener = (payload: any) => void;
+interface EventSource {
+  addListener(event: string, l: Listener): { remove(): void };
+}
 
+// Sin módulo nativo (tests, plataforma sin implementar) devuelve un emisor inerte.
+export const sshEvents: EventSource = native
+  ? (new NativeEventEmitter(NativeModules.LuloSsh) as unknown as EventSource)
+  : { addListener: () => ({ remove() {} }) };
+
+/** Codifica texto en UTF-8 y lo devuelve en base64. */
 export function toBase64(text: string): string {
-  const bytes = new TextEncoder().encode(text);
-  let bin = '';
-  bytes.forEach(b => (bin += String.fromCharCode(b)));
-  return globalThis.btoa(bin);
+  const bin = encodeURIComponent(text).replace(/%([0-9A-F]{2})/g, (_m, h) =>
+    String.fromCharCode(parseInt(h, 16)),
+  );
+  return (globalThis as any).btoa(bin);
 }

@@ -6,11 +6,11 @@
 export type Modifier = 'ctrl' | 'alt' | 'shift';
 
 export type KeyAction =
-  | {kind: 'key'; key: NamedKey}
-  | {kind: 'text'; text: string}
-  | {kind: 'modifier'; modifier: Modifier}
-  | {kind: 'macro'; sequence: string} // texto o secuencias crudas, puede incluir \r
-  | {kind: 'layer'; layer: string};
+  | { kind: 'key'; key: NamedKey }
+  | { kind: 'text'; text: string }
+  | { kind: 'modifier'; modifier: Modifier }
+  | { kind: 'macro'; sequence: string } // texto o secuencias crudas, puede incluir \r
+  | { kind: 'layer'; layer: string };
 
 export type NamedKey =
   | 'esc'
@@ -124,7 +124,7 @@ const k = (
   label: string,
   action: KeyAction,
   repeat = false,
-): KeyButton => ({id, label, action, repeat});
+): KeyButton => ({ id, label, action, repeat });
 
 export const DEFAULT_LAYOUT: KeyboardLayout = {
   id: 'default',
@@ -135,28 +135,28 @@ export const DEFAULT_LAYOUT: KeyboardLayout = {
       name: 'Principal',
       rows: [
         [
-          k('esc', 'Esc', {kind: 'key', key: 'esc'}),
-          k('tab', 'Tab', {kind: 'key', key: 'tab'}),
-          k('ctrl', 'Ctrl', {kind: 'modifier', modifier: 'ctrl'}),
-          k('alt', 'Alt', {kind: 'modifier', modifier: 'alt'}),
-          k('shift', 'Shift', {kind: 'modifier', modifier: 'shift'}),
-          k('up', '↑', {kind: 'key', key: 'up'}, true),
-          k('down', '↓', {kind: 'key', key: 'down'}, true),
-          k('left', '←', {kind: 'key', key: 'left'}, true),
-          k('right', '→', {kind: 'key', key: 'right'}, true),
-          k('ai', 'IA', {kind: 'layer', layer: 'ai'}),
+          k('esc', 'Esc', { kind: 'key', key: 'esc' }),
+          k('tab', 'Tab', { kind: 'key', key: 'tab' }),
+          k('ctrl', 'Ctrl', { kind: 'modifier', modifier: 'ctrl' }),
+          k('alt', 'Alt', { kind: 'modifier', modifier: 'alt' }),
+          k('shift', 'Shift', { kind: 'modifier', modifier: 'shift' }),
+          k('up', '↑', { kind: 'key', key: 'up' }, true),
+          k('down', '↓', { kind: 'key', key: 'down' }, true),
+          k('left', '←', { kind: 'key', key: 'left' }, true),
+          k('right', '→', { kind: 'key', key: 'right' }, true),
+          k('ai', 'IA', { kind: 'layer', layer: 'ai' }),
         ],
         [
-          k('pipe', '|', {kind: 'text', text: '|'}),
-          k('tilde', '~', {kind: 'text', text: '~'}),
-          k('slash', '/', {kind: 'text', text: '/'}),
-          k('dash', '-', {kind: 'text', text: '-'}),
-          k('under', '_', {kind: 'text', text: '_'}),
-          k('bslash', '\\', {kind: 'text', text: '\\'}),
-          k('home', 'Home', {kind: 'key', key: 'home'}),
-          k('end', 'End', {kind: 'key', key: 'end'}),
-          k('pgup', 'PgUp', {kind: 'key', key: 'pageUp'}),
-          k('pgdn', 'PgDn', {kind: 'key', key: 'pageDown'}),
+          k('pipe', '|', { kind: 'text', text: '|' }),
+          k('tilde', '~', { kind: 'text', text: '~' }),
+          k('slash', '/', { kind: 'text', text: '/' }),
+          k('dash', '-', { kind: 'text', text: '-' }),
+          k('under', '_', { kind: 'text', text: '_' }),
+          k('bslash', '\\', { kind: 'text', text: '\\' }),
+          k('home', 'Home', { kind: 'key', key: 'home' }),
+          k('end', 'End', { kind: 'key', key: 'end' }),
+          k('pgup', 'PgUp', { kind: 'key', key: 'pageUp' }),
+          k('pgdn', 'PgDn', { kind: 'key', key: 'pageDown' }),
         ],
       ],
     },
@@ -165,24 +165,24 @@ export const DEFAULT_LAYOUT: KeyboardLayout = {
       name: 'IA',
       rows: [
         [
-          k('ai-back', '←', {kind: 'layer', layer: 'main'}),
-          k('ai-esc', 'Esc', {kind: 'key', key: 'esc'}),
-          k('ai-esc2', 'Esc Esc', {kind: 'macro', sequence: `${ESC}${ESC}`}),
-          k('ai-stab', '⇧Tab', {kind: 'macro', sequence: `${ESC}[Z`}),
-          k('ai-c', '^C', {kind: 'macro', sequence: '\x03'}),
-          k('ai-d', '^D', {kind: 'macro', sequence: '\x04'}),
-          k('ai-r', '^R', {kind: 'macro', sequence: '\x12'}),
-          k('ai-enter', '⏎', {kind: 'key', key: 'enter'}),
+          k('ai-back', '←', { kind: 'layer', layer: 'main' }),
+          k('ai-esc', 'Esc', { kind: 'key', key: 'esc' }),
+          k('ai-esc2', 'Esc Esc', { kind: 'macro', sequence: `${ESC}${ESC}` }),
+          k('ai-stab', '⇧Tab', { kind: 'macro', sequence: `${ESC}[Z` }),
+          k('ai-c', '^C', { kind: 'macro', sequence: '\x03' }),
+          k('ai-d', '^D', { kind: 'macro', sequence: '\x04' }),
+          k('ai-r', '^R', { kind: 'macro', sequence: '\x12' }),
+          k('ai-enter', '⏎', { kind: 'key', key: 'enter' }),
         ],
         [
-          k('ai-slash', '/', {kind: 'text', text: '/'}),
-          k('ai-at', '@', {kind: 'text', text: '@'}),
-          k('ai-hash', '#', {kind: 'text', text: '#'}),
-          k('ai-bang', '!', {kind: 'text', text: '!'}),
-          k('ai-yes', 'yes', {kind: 'macro', sequence: 'yes\r'}),
-          k('ai-1', '1', {kind: 'macro', sequence: '1'}),
-          k('ai-2', '2', {kind: 'macro', sequence: '2'}),
-          k('ai-3', '3', {kind: 'macro', sequence: '3'}),
+          k('ai-slash', '/', { kind: 'text', text: '/' }),
+          k('ai-at', '@', { kind: 'text', text: '@' }),
+          k('ai-hash', '#', { kind: 'text', text: '#' }),
+          k('ai-bang', '!', { kind: 'text', text: '!' }),
+          k('ai-yes', 'yes', { kind: 'macro', sequence: 'yes\r' }),
+          k('ai-1', '1', { kind: 'macro', sequence: '1' }),
+          k('ai-2', '2', { kind: 'macro', sequence: '2' }),
+          k('ai-3', '3', { kind: 'macro', sequence: '3' }),
         ],
       ],
     },
