@@ -7,7 +7,9 @@
   };
 
   var term = new Terminal({
-    cursorBlink: true,
+    // Sin parpadeo: con teclado nativo xterm no tiene foco y un cursor que
+    // parpadea se queda "apagado" (invisible). Lo queremos siempre sólido.
+    cursorBlink: false,
     cursorStyle: 'block',
     // En Android el teclado va a una vista nativa y xterm nunca tiene el foco:
     // sin esto pinta el cursor "inactivo" (contorno casi invisible).

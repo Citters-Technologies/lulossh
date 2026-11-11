@@ -29,19 +29,19 @@ const html = `<!doctype html>
 <style>${css}
 html,body{margin:0;padding:0;height:100%;background:#0b0f14;overflow:hidden}
 #term{position:absolute;inset:0;padding:4px}
-/* Con teclado nativo xterm nunca tiene foco: forzamos el cursor sólido y
-   visible (verde de marca) tanto en bloque como en "outline", y sin parpadeo
-   que lo oculte, para poder seguirlo al moverse por el prompt. */
-.xterm .xterm-cursor-block,
-.xterm .xterm-cursor-block.xterm-cursor-outline{
+/* Con teclado nativo xterm nunca tiene foco, así que pinta el cursor "inactivo"
+   (un recuadro de 1px casi invisible) y, si parpadea, lo deja apagado. Pintamos
+   la clase base .xterm-cursor (siempre presente) como un bloque sólido verde de
+   marca, sea cual sea su estilo, visible y sin parpadeo, para poder seguirlo al
+   moverse por el prompt. */
+.xterm .xterm-cursor,
+.xterm .xterm-cursor.xterm-cursor-outline,
+.xterm .xterm-cursor.xterm-cursor-bar,
+.xterm .xterm-cursor.xterm-cursor-underline{
   background-color:#9be22d !important;color:#0b0f14 !important;
   outline:none !important;box-shadow:none !important;
+  opacity:1 !important;visibility:visible !important;
 }
-.xterm .xterm-cursor-bar{box-shadow:1px 0 0 1px #9be22d inset !important;}
-.xterm .xterm-cursor-underline{box-shadow:0 -1px 0 1px #9be22d inset !important;}
-.xterm .xterm-cursor-blink,
-.xterm .xterm-cursor-block,
-.xterm .xterm-cursor-outline{visibility:visible !important;opacity:1 !important;}
 </style></head>
 <body><div id="term"></div>
 <script>${safe(xtermJs)}</script>

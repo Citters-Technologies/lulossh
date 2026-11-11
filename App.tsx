@@ -15,6 +15,7 @@ import { SessionsScreen } from './src/screens/SessionsScreen';
 import { Tab, TabShell } from './src/ui/TabShell';
 import { LockScreen } from './src/screens/LockScreen';
 import { SettingsScreen } from './src/screens/SettingsScreen';
+import { LicensesScreen } from './src/screens/LicensesScreen';
 import {
   consumeExternalActivity,
   loadLockSettings,
@@ -48,6 +49,7 @@ type Route =
   | { name: 'keys'; from?: Route }
   | { name: 'settings' }
   | { name: 'keybar' }
+  | { name: 'licenses' }
   | {
       name: 'terminal';
       host: Host;
@@ -222,7 +224,7 @@ export default function App() {
       setRoute(
         route.name === 'keys' && route.from
           ? route.from
-          : route.name === 'keybar'
+          : route.name === 'keybar' || route.name === 'licenses'
           ? { name: 'settings' }
           : { name: 'hosts' },
       );
@@ -351,12 +353,16 @@ export default function App() {
           store={store}
           onBack={home}
           onEditKeyBar={() => setRoute({ name: 'keybar' })}
+          onLicenses={() => setRoute({ name: 'licenses' })}
           onLockChange={s => (lockSettings.current = s)}
         />
       );
       break;
     case 'keybar':
       screen = <KeyBarEditorScreen onBack={() => setRoute({ name: 'settings' })} />;
+      break;
+    case 'licenses':
+      screen = <LicensesScreen onBack={() => setRoute({ name: 'settings' })} />;
       break;
     case 'editHost':
       screen = (

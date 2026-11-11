@@ -30,11 +30,13 @@ export function SettingsScreen({
   store,
   onBack,
   onEditKeyBar,
+  onLicenses,
   onLockChange,
 }: {
   store: Store;
   onBack(): void;
   onEditKeyBar(): void;
+  onLicenses(): void;
   onLockChange(s: LockSettings): void;
 }) {
   const [lock, setLock] = useState<LockSettings | null>(null);
@@ -217,6 +219,12 @@ export function SettingsScreen({
           title="LuloSSH"
           sub="Código abierto (AGPL-3.0) · Citters Technologies SLU"
           onPress={() => Linking.openURL(REPO)}
+        />
+        <Item
+          icon="⚖️"
+          title="Componentes y licencias"
+          sub="Librerías de terceros que incluye la app y sus licencias"
+          onPress={onLicenses}
         />
       </ScrollView>
 
