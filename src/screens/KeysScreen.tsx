@@ -12,9 +12,12 @@ type Mode = 'list' | 'generate' | 'import';
 export function KeysScreen({
   store,
   onBack,
+  embedded = false,
 }: {
   store: Store;
   onBack(): void;
+  /** Dentro de las pestañas: sin cabecera propia. */
+  embedded?: boolean;
 }) {
   const [mode, setMode] = useState<Mode>('list');
   const [name, setName] = useState('');
@@ -123,12 +126,15 @@ export function KeysScreen({
       ],
     );
 
+  const Root = embedded ? View : SafeAreaView;
   return (
-    <SafeAreaView style={styles.screen}>
-      <Header
-        title="Claves"
-        left={{ label: '‹ Hosts', onPress: mode === 'list' ? onBack : reset }}
-      />
+    <Root style={styles.screen}>
+      {!embedded && (
+        <Header
+          title="Claves"
+          left={{ label: '‹ Volver', onPress: mode === 'list' ? onBack : reset }}
+        />
+      )}
       <ScrollView
         contentContainerStyle={styles.body}
         keyboardShouldPersistTaps="handled"
@@ -229,6 +235,6 @@ export function KeysScreen({
           </>
         )}
       </ScrollView>
-    </SafeAreaView>
+    </Root>
   );
 }

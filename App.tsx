@@ -9,7 +9,10 @@ import {
   StyleSheet,
   View,
 } from 'react-native';
+import { IdentitiesScreen } from './src/screens/IdentitiesScreen';
 import { KeyBarEditorScreen } from './src/screens/KeyBarEditorScreen';
+import { SessionsScreen } from './src/screens/SessionsScreen';
+import { Tab, TabShell } from './src/ui/TabShell';
 import { LockScreen } from './src/screens/LockScreen';
 import { SettingsScreen } from './src/screens/SettingsScreen';
 import { loadLockSettings, LockSettings, shouldRelock } from './src/ui/appLock';
@@ -50,7 +53,9 @@ export default function App() {
   // null = leyendo ajustes; el vault no se lee hasta desbloquear.
   const [locked, setLockedState] = useState<boolean | null>(null);
   const store = useStore(locked === false);
+  // 'hosts' es la vista de pestañas; `tab` dice cuál se ve.
   const [route, setRoute] = useState<Route>({ name: 'hosts' });
+  const [tab, setTab] = useState<Tab>('hosts');
   const [live, setLive] = useState<LiveSession[]>([]);
   const home = () => setRoute({ name: 'hosts' });
   const setLocked = (v: boolean) => {
@@ -196,6 +201,10 @@ export default function App() {
   useEffect(() => {
     const sub = BackHandler.addEventListener('hardwareBackPress', () => {
       if (route.name === 'hosts') {
+        if (tab !== 'hosts') {
+          setTab('hosts');
+          return true;
+        }
         return false;
       }
       setRoute(
@@ -208,9 +217,11 @@ export default function App() {
       return true;
     });
     return () => sub.remove();
-  }, [route]);
+  }, [route, tab]);
 
-  const connect = (h: Host) => {
+  const connect = (stored: Host) => {
+    // Credenciales efectivas: las de su identidad, si usa una.
+    const h = store.resolve(stored);
     // Hosts importados sin usuario o sin credenciales: completar antes.
     const missing =
       validateHost(h) ||
@@ -218,8 +229,11 @@ export default function App() {
         ? 'Falta la contraseña o la clave'
         : null);
     if (missing) {
-      Alert.alert('Completa el host', missing);
-      setRoute({ name: 'editHost', host: h });
+      Alert.alert(
+        'Completa el host',
+        `${missing}. Edítalo o asígnale una identidad.`,
+      );
+      setRoute({ name: 'editHost', host: stored });
       return;
     }
     const open = () => {
@@ -249,24 +263,56 @@ export default function App() {
 
   let screen: React.ReactNode;
   switch (route.name) {
-    case 'hosts':
+    case 'hosts': {
+      const disconnect = (s: LiveSession) =>
+        Ssh.disconnect(s.sessionId)
+          .catch(() => {})
+          .then(refreshLive);
       screen = (
-        <HostsScreen
-          store={store}
-          live={live}
-          onResume={openLive}
-          onDisconnect={s =>
-            Ssh.disconnect(s.sessionId)
-              .catch(() => {})
-              .then(refreshLive)
-          }
-          onConnect={connect}
-          onEdit={h => setRoute({ name: 'editHost', host: h })}
-          onKeys={() => setRoute({ name: 'keys' })}
+        <TabShell
+          tab={tab}
+          onTab={t => {
+            setTab(t);
+            if (t === 'sessions') {
+              refreshLive();
+            }
+          }}
+          sessionsCount={live.length}
           onSettings={() => setRoute({ name: 'settings' })}
-        />
+          action={
+            tab === 'hosts'
+              ? { label: '＋ Host', onPress: () => setRoute({ name: 'editHost' }) }
+              : undefined
+          }
+        >
+          {tab === 'hosts' && (
+            <HostsScreen
+              store={store}
+              live={live}
+              onResume={openLive}
+              onDisconnect={disconnect}
+              onConnect={connect}
+              onEdit={h => setRoute({ name: 'editHost', host: h })}
+            />
+          )}
+          {tab === 'sessions' && (
+            <SessionsScreen
+              live={live}
+              onResume={openLive}
+              onDisconnect={s => Ssh.disconnect(s.sessionId).catch(() => {})}
+              onRefresh={refreshLive}
+            />
+          )}
+          {tab === 'identities' && (
+            <IdentitiesScreen store={store} onKeys={() => setTab('keys')} />
+          )}
+          {tab === 'keys' && (
+            <KeysScreen store={store} onBack={() => setTab('hosts')} embedded />
+          )}
+        </TabShell>
       );
       break;
+    }
     case 'settings':
       screen = (
         <SettingsScreen

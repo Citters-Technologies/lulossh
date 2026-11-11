@@ -9,8 +9,6 @@ import {
   TextInput,
   View,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
-import { isIncomplete } from '../import/merge';
 import { confirmUpdates, importFromJuiceSsh, showSummary } from '../import/ui';
 import { parseImport } from '../import/xshell';
 import { LiveSession, Ssh } from '../native/SshModule';
@@ -30,8 +28,6 @@ export function HostsScreen({
   onDisconnect,
   onConnect,
   onEdit,
-  onKeys,
-  onSettings,
 }: {
   store: Store;
   /** Sesiones abiertas en segundo plano. */
@@ -40,8 +36,6 @@ export function HostsScreen({
   onDisconnect(s: LiveSession): void;
   onConnect(h: Host): void;
   onEdit(h?: Host): void;
-  onKeys(): void;
-  onSettings(): void;
 }) {
   const [q, setQ] = useState('');
   const [busy, setBusy] = useState(false);
@@ -150,9 +144,10 @@ export function HostsScreen({
   const renderHost = (h: Host, depth = 0, keyPrefix = '') => (
     <HostRow
       key={keyPrefix + h.id}
-      host={h}
+      host={store.resolve(h)}
       depth={depth}
-      incomplete={isIncomplete(h, store.keys)}
+      incomplete={store.isIncomplete(h)}
+      identity={store.identities.find(i => i.id === h.identityId)?.name}
       live={liveHosts.has(h.id)}
       onPress={() => onConnect(h)}
       onLongPress={() => onEdit(h)}
@@ -196,33 +191,7 @@ export function HostsScreen({
   );
 
   return (
-    <SafeAreaView style={styles.screen}>
-      <View style={local.header}>
-        <Text style={local.brand}>
-          Lulo<Text style={local.brandAccent}>SSH</Text>
-        </Text>
-        <Pressable
-          onPress={onSettings}
-          hitSlop={8}
-          style={local.headerBtn}
-          accessibilityLabel="Ajustes"
-        >
-          <Text style={local.headerBtnText}>⚙</Text>
-        </Pressable>
-        <Pressable onPress={onKeys} hitSlop={8} style={local.headerBtn}>
-          <Text style={local.headerBtnText}>🔑 Claves</Text>
-        </Pressable>
-        <Pressable
-          onPress={() => onEdit()}
-          hitSlop={8}
-          style={[local.headerBtn, local.headerBtnPrimary]}
-        >
-          <Text style={[local.headerBtnText, local.headerBtnPrimaryText]}>
-            ＋ Host
-          </Text>
-        </Pressable>
-      </View>
-
+    <View style={styles.screen}>
       <ScrollView
         contentContainerStyle={local.body}
         keyboardShouldPersistTaps="handled"
@@ -391,7 +360,7 @@ export function HostsScreen({
           </View>
         </View>
       </Modal>
-    </SafeAreaView>
+    </View>
   );
 }
 
@@ -421,6 +390,7 @@ function HostRow({
   host: h,
   depth,
   incomplete,
+  identity,
   live,
   onPress,
   onLongPress,
@@ -429,6 +399,8 @@ function HostRow({
   host: Host;
   depth: number;
   incomplete: boolean;
+  /** Nombre de la identidad que usa, si usa una. */
+  identity?: string;
   live: boolean;
   onPress(): void;
   onLongPress(): void;
@@ -460,6 +432,8 @@ function HostRow({
         <Text style={local.hostSub} numberOfLines={1}>
           {incomplete ? (
             <Text style={local.warn}>⚠ faltan credenciales · </Text>
+          ) : identity ? (
+            <Text>👤 {identity} · </Text>
           ) : (
             <Text>{h.auth.type === 'password' ? '🔒 ' : '🔑 '}</Text>
           )}

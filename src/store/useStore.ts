@@ -8,11 +8,12 @@ import {
 import type { ImportResult } from '../import/xshell';
 import { renameFolder } from './folders';
 import { Ssh } from '../native/SshModule';
-import { Host, SshKey } from './models';
+import { Host, Identity, resolveHost, SshKey } from './models';
 import { newId, readJson, withUnlock, writeJson } from './vault';
 
 const HOSTS = 'hosts';
 const KEYS = 'keys';
+const IDENTITIES = 'identities';
 
 /**
  * Estado de hosts y claves, persistido cifrado en el vault.
@@ -22,18 +23,21 @@ const KEYS = 'keys';
 export function useStore(enabled = true) {
   const [hosts, setHosts] = useState<Host[]>([]);
   const [keys, setKeys] = useState<SshKey[]>([]);
+  const [identities, setIdentities] = useState<Identity[]>([]);
   const [loaded, setLoaded] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     try {
       setError(null);
-      const [h, k] = [
+      const [h, k, i] = [
         await readJson<Host[]>(HOSTS, []),
         await readJson<SshKey[]>(KEYS, []),
+        await readJson<Identity[]>(IDENTITIES, []),
       ];
       setHosts(h);
       setKeys(k);
+      setIdentities(i);
       setLoaded(true);
     } catch (e: any) {
       setError(e?.message ?? String(e));
@@ -58,10 +62,65 @@ export function useStore(enabled = true) {
     setKeys(next);
   };
 
+  const saveIdentities = async (next: Identity[]) => {
+    await writeJson(IDENTITIES, next);
+    setIdentities(next);
+  };
+
   return {
     hosts,
     keys,
+    identities,
     loaded,
+
+    /** Host con las credenciales efectivas (identidad aplicada). */
+    resolve: (h: Host) => resolveHost(h, identities),
+    isIncomplete: (h: Host) => isIncomplete(h, keys, identities),
+
+    upsertIdentity: (i: Omit<Identity, 'id'> & { id?: string }) => {
+      const idn: Identity = { ...i, id: i.id ?? newId() };
+      const exists = identities.some(x => x.id === idn.id);
+      return saveIdentities(
+        exists
+          ? identities.map(x => (x.id === idn.id ? idn : x))
+          : [...identities, idn],
+      ).then(() => idn);
+    },
+
+    /** Al borrar una identidad, sus hosts quedan con sus propios datos. */
+    deleteIdentity: async (id: string) => {
+      const users = hosts.filter(h => h.identityId === id);
+      if (users.length) {
+        await saveHosts(
+          hosts.map(h =>
+            h.identityId === id ? { ...h, identityId: undefined } : h,
+          ),
+        );
+      }
+      await saveIdentities(identities.filter(i => i.id !== id));
+    },
+
+    /** Deja la identidad exactamente en estos hosts (quita del resto). */
+    setIdentityHosts: (identityId: string, hostIds: string[]) =>
+      saveHosts(
+        hosts.map(h =>
+          hostIds.includes(h.id)
+            ? { ...h, identityId }
+            : h.identityId === identityId
+            ? { ...h, identityId: undefined }
+            : h,
+        ),
+      ),
+
+    /** Asigna (o quita, con null) una identidad a varios hosts de una vez. */
+    assignIdentity: (identityId: string | null, hostIds: string[]) =>
+      saveHosts(
+        hosts.map(h =>
+          hostIds.includes(h.id)
+            ? { ...h, identityId: identityId ?? undefined }
+            : h,
+        ),
+      ),
     error,
     reload: load,
 
@@ -134,7 +193,7 @@ export function useStore(enabled = true) {
         await saveKeys(allKeys);
       }
 
-      const plan = planImport(hosts, allKeys, data.hosts, newId);
+      const plan = planImport(hosts, allKeys, data.hosts, newId, identities);
       const visible = plan.toUpdate.filter(u => u.changes.length);
       const apply =
         visible.length === 0 ? true : await confirmUpdates(visible);
@@ -155,21 +214,22 @@ export function useStore(enabled = true) {
         updated: apply ? visible.length : 0,
         duplicates: plan.duplicates,
         keys: newKeys.length,
-        incomplete: next.filter(h => isIncomplete(h, allKeys)).length,
+        incomplete: next.filter(h => isIncomplete(h, allKeys, identities))
+          .length,
         notes: [...report, ...plan.notes, ...data.skipped],
       };
     },
 
     /** Hosts importados que esperaban esta clave (por nombre). */
     hostsWaitingForKey: (key: SshKey) =>
-      hostsWaitingForKey(hosts, keys, key.name),
+      hostsWaitingForKey(hosts, keys, key.name, identities),
 
     /** Asigna una clave a varios hosts de una vez. */
     assignKey: (keyId: string, hostIds: string[]) =>
       saveHosts(
         hosts.map(h =>
           hostIds.includes(h.id)
-            ? { ...h, auth: { type: 'privateKey', keyId } }
+            ? { ...h, auth: { type: 'privateKey', keyId }, identityId: undefined }
             : h,
         ),
       ),
@@ -178,16 +238,19 @@ export function useStore(enabled = true) {
     renameFolder: (from: string, to: string) =>
       saveHosts(renameFolder(hosts, from, to)),
 
-    /** No se puede borrar una clave en uso por algún host. */
+    /** No se puede borrar una clave en uso por algún host o identidad. */
     deleteKey: async (id: string) => {
-      const users = hosts.filter(
-        h => h.auth.type === 'privateKey' && h.auth.keyId === id,
-      );
+      const uses = (a: Host['auth']) =>
+        a.type === 'privateKey' && a.keyId === id;
+      const users = [
+        ...hosts.filter(h => uses(h.auth)).map(h => h.name),
+        ...identities.filter(i => uses(i.auth)).map(i => `identidad ${i.name}`),
+      ];
       if (users.length) {
         throw new Error(
-          `La usan: ${users
-            .map(h => h.name)
-            .join(', ')}. Cambia esos hosts primero.`,
+          `La usan: ${users.slice(0, 8).join(', ')}${
+            users.length > 8 ? '…' : ''
+          }. Cámbialos primero.`,
         );
       }
       await withUnlock(() => Ssh.deleteKey(id));

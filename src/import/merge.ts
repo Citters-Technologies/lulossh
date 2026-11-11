@@ -4,11 +4,19 @@
  * con los datos nuevos (clave que antes faltaba, usuario, carpeta…).
  */
 import { normPath } from '../store/folders';
-import type { Host, SshKey } from '../store/models';
+import { Host, Identity, resolveHost, SshKey } from '../store/models';
 import type { ImportedHost } from './xshell';
 
-/** Host sin usuario, sin contraseña o con una clave que ya no existe. */
-export function isIncomplete(h: Host, keys: Pick<SshKey, 'id'>[]): boolean {
+/**
+ * Host sin usuario, sin contraseña o con una clave que ya no existe (tras
+ * aplicar su identidad, si tiene).
+ */
+export function isIncomplete(
+  host: Host,
+  keys: Pick<SshKey, 'id'>[],
+  identities: Identity[] = [],
+): boolean {
+  const h = resolveHost(host, identities);
   if (!h.username.trim()) {
     return true;
   }
@@ -41,6 +49,7 @@ export function planImport(
   keys: SshKey[],
   imported: ImportedHost[],
   newId: () => string,
+  identities: Identity[] = [],
 ): ImportPlan {
   const keyByName = new Map(keys.map(k => [k.name.toLowerCase(), k.id]));
   const plan: ImportPlan = { toAdd: [], toUpdate: [], duplicates: 0, notes: [] };
@@ -85,7 +94,7 @@ export function planImport(
     claimed.add(match.id);
     const patch: Partial<Host> = {};
     const changes: string[] = [];
-    if (isIncomplete(match, keys) && keyId) {
+    if (isIncomplete(match, keys, identities) && keyId) {
       patch.auth = { type: 'privateKey', keyId };
       changes.push(`clave ${h.keyName}`);
     }
@@ -117,9 +126,12 @@ export function hostsWaitingForKey(
   hosts: Host[],
   keys: SshKey[],
   keyName: string,
+  identities: Identity[] = [],
 ): Host[] {
   const n = keyName.toLowerCase();
   return hosts.filter(
-    h => h.importedKeyName?.toLowerCase() === n && isIncomplete(h, keys),
+    h =>
+      h.importedKeyName?.toLowerCase() === n &&
+      isIncomplete(h, keys, identities),
   );
 }

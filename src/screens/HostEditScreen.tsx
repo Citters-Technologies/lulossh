@@ -2,7 +2,7 @@ import React, { useMemo, useState } from 'react';
 import { Alert, Pressable, ScrollView, StyleSheet, Text } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { allFolderPaths, normPath, splitPath } from '../store/folders';
-import { Host, HostAuth, validateHost } from '../store/models';
+import { Host, HostAuth, resolveHost, validateHost } from '../store/models';
 import { Store } from '../store/useStore';
 import { Button, colors, Field, Header, Segmented, styles } from '../ui/kit';
 
@@ -16,7 +16,10 @@ const local = StyleSheet.create({
   },
   chipActive: { backgroundColor: colors.accent },
   chipText: { color: colors.text },
+  selected: { borderWidth: 2, borderColor: colors.accent },
 });
+
+type AuthChoice = 'identity' | HostAuth['type'];
 
 export function HostEditScreen({
   store,
@@ -34,8 +37,18 @@ export function HostEditScreen({
   const [port, setPort] = useState(String(host?.port ?? 22));
   const [username, setUsername] = useState(host?.username ?? '');
   const [group, setGroup] = useState(host?.group ?? '');
-  const [authType, setAuthType] = useState<HostAuth['type']>(
-    host?.auth.type ?? (store.keys.length ? 'privateKey' : 'password'),
+  const [authType, setAuthType] = useState<AuthChoice>(
+    host?.identityId && store.identities.some(i => i.id === host.identityId)
+      ? 'identity'
+      : host?.auth.type ??
+          (store.identities.length
+            ? 'identity'
+            : store.keys.length
+            ? 'privateKey'
+            : 'password'),
+  );
+  const [identityId, setIdentityId] = useState(
+    host?.identityId ?? store.identities[0]?.id ?? '',
   );
   const [password, setPassword] = useState(
     host?.auth.type === 'password' ? host.auth.password : '',
@@ -50,6 +63,14 @@ export function HostEditScreen({
   const folders = useMemo(() => allFolderPaths(store.hosts), [store.hosts]);
 
   const save = async () => {
+    const identity =
+      authType === 'identity'
+        ? store.identities.find(i => i.id === identityId)
+        : undefined;
+    if (authType === 'identity' && !identity) {
+      setError('Elige una identidad');
+      return;
+    }
     const draft: Omit<Host, 'id'> = {
       ...host,
       name: name.trim() || address.trim(),
@@ -57,16 +78,20 @@ export function HostEditScreen({
       port: Number(port),
       username: username.trim(),
       group: normPath(group),
+      identityId: identity?.id,
       auth:
         authType === 'password'
           ? { type: 'password', password }
-          : { type: 'privateKey', keyId },
+          : authType === 'privateKey'
+          ? { type: 'privateKey', keyId }
+          : host?.auth ?? { type: 'password', password: '' },
     };
     // Si cambia el destino, la huella guardada ya no aplica.
     if (host && (host.host !== draft.host || host.port !== draft.port)) {
       draft.fingerprint = undefined;
     }
-    const err = validateHost(draft);
+    // Con identidad, el usuario y las credenciales salen de ella.
+    const err = validateHost(identity ? resolveHost(draft as Host, [identity]) : draft);
     setError(err);
     if (err) {
       return;
@@ -127,7 +152,9 @@ export function HostEditScreen({
           onChangeText={setPort}
           keyboardType="number-pad"
         />
-        <Field label="Usuario" value={username} onChangeText={setUsername} />
+        {authType !== 'identity' && (
+          <Field label="Usuario" value={username} onChangeText={setUsername} />
+        )}
         <Field
           label="Carpeta (opcional, “/” para anidar)"
           value={group}
@@ -159,15 +186,38 @@ export function HostEditScreen({
         )}
 
         <Text style={styles.section}>Autenticación</Text>
-        <Segmented<HostAuth['type']>
+        <Segmented<AuthChoice>
           value={authType}
           onChange={setAuthType}
           options={[
+            { value: 'identity', label: 'Identidad' },
             { value: 'privateKey', label: 'Clave' },
             { value: 'password', label: 'Contraseña' },
           ]}
         />
-        {authType === 'password' ? (
+        {authType === 'identity' ? (
+          store.identities.length === 0 ? (
+            <Text style={styles.rowSub}>
+              Aún no hay identidades. Créalas en la pestaña “Identidades” (un
+              usuario con su clave o contraseña, reutilizable en muchos
+              hosts).
+            </Text>
+          ) : (
+            store.identities.map(i => (
+              <Pressable
+                key={i.id}
+                onPress={() => setIdentityId(i.id)}
+                style={[styles.row, i.id === identityId && local.selected]}
+              >
+                <Text style={styles.rowTitle}>👤 {i.name}</Text>
+                <Text style={styles.rowSub}>
+                  {i.username} ·{' '}
+                  {i.auth.type === 'password' ? 'contraseña' : 'clave'}
+                </Text>
+              </Pressable>
+            ))
+          )
+        ) : authType === 'password' ? (
           <Field
             label="Contraseña"
             value={password}

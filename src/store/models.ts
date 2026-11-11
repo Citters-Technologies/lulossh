@@ -23,6 +23,25 @@ export interface Host {
    * Sirve para enlazarla si se importa más tarde.
    */
   importedKeyName?: string;
+  /**
+   * Identidad reutilizable (usuario + credenciales). Si está, manda sobre
+   * username/auth del propio host.
+   */
+  identityId?: string;
+}
+
+/** Usuario + credenciales reutilizables en muchos hosts (como en JuiceSSH). */
+export interface Identity {
+  id: string;
+  name: string;
+  username: string;
+  auth: HostAuth;
+}
+
+/** Host con el usuario y las credenciales efectivas (las de su identidad). */
+export function resolveHost(h: Host, identities: Identity[]): Host {
+  const idn = h.identityId && identities.find(i => i.id === h.identityId);
+  return idn ? { ...h, username: idn.username, auth: idn.auth } : h;
 }
 
 export interface SshKey {
