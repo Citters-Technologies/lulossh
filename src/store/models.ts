@@ -15,6 +15,9 @@ export interface Host {
   /** Agrupación libre, p. ej. "Clientes" o "Casa". */
   group?: string;
   lastUsedAt?: number;
+  /** Veces que se ha conectado (para "Usados con frecuencia"). */
+  useCount?: number;
+  favorite?: boolean;
   /**
    * Nombre de la clave en el cliente de origen (p. ej. UserKey de Xshell).
    * Sirve para enlazarla si se importa más tarde.

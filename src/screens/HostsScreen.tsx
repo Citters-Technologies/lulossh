@@ -6,6 +6,7 @@ import {
   ScrollView,
   StyleSheet,
   Text,
+  TextInput,
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -14,11 +15,12 @@ import { parseImport } from '../import/xshell';
 import { LiveSession, Ssh } from '../native/SshModule';
 import { buildTree, FolderNode, normPath, splitPath } from '../store/folders';
 import { Host, hostLabel } from '../store/models';
+import { byName, colorFor, favorites, frequent } from '../store/ranking';
 import { Store } from '../store/useStore';
-import { Button, colors, Field, Header, styles } from '../ui/kit';
+import { Button, colors, Field, styles } from '../ui/kit';
 
 const COLLAPSED_PREF = 'collapsedGroups';
-const INDENT = 14;
+const INDENT = 16;
 
 export function HostsScreen({
   store,
@@ -43,6 +45,7 @@ export function HostsScreen({
   const [renaming, setRenaming] = useState<{ from: string; to: string } | null>(
     null,
   );
+  const searching = q.trim().length > 0;
 
   // Carpetas plegadas (por ruta), recordadas entre sesiones. No es sensible.
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
@@ -61,7 +64,7 @@ export function HostsScreen({
       return next;
     });
   // Al buscar se despliega todo, para no esconder resultados.
-  const isCollapsed = (path: string) => !q.trim() && collapsed.has(path);
+  const isCollapsed = (path: string) => !searching && collapsed.has(path);
 
   const confirmUpdates = (
     updates: { name: string; changes: string[] }[],
@@ -118,18 +121,23 @@ export function HostsScreen({
     }
   };
 
-  const tree = useMemo(() => {
+  const filtered = useMemo(() => {
     const needle = q.trim().toLowerCase();
-    const list = store.hosts.filter(
+    return store.hosts.filter(
       h =>
         !needle ||
         h.name.toLowerCase().includes(needle) ||
         hostLabel(h).toLowerCase().includes(needle) ||
         (h.group ?? '').toLowerCase().includes(needle),
     );
-    // Dentro de cada carpeta, los usados más recientemente primero.
-    return buildTree(list, (a, b) => (b.lastUsedAt ?? 0) - (a.lastUsedAt ?? 0));
   }, [store.hosts, q]);
+  const tree = useMemo(() => buildTree(filtered, byName), [filtered]);
+  const favs = useMemo(() => favorites(store.hosts), [store.hosts]);
+  const freq = useMemo(() => frequent(store.hosts), [store.hosts]);
+  const liveHosts = useMemo(
+    () => new Set(live.map(s => s.hostId).filter(Boolean)),
+    [live],
+  );
 
   const saveRename = async () => {
     if (!renaming) {
@@ -144,34 +152,21 @@ export function HostsScreen({
     }
   };
 
-  const renderHost = (h: Host, depth: number) => {
-    const incomplete = isIncomplete(h, store.keys);
-    return (
-      <Pressable
-        key={h.id}
-        onPress={() => onConnect(h)}
-        onLongPress={() => onEdit(h)}
-        style={({ pressed }) => [
-          styles.row,
-          { marginLeft: depth * INDENT },
-          pressed && local.dim,
-        ]}
-      >
-        <Text style={styles.rowTitle}>
-          {incomplete ? '⚠ ' : ''}
-          {h.name || h.host}
-        </Text>
-        <Text style={styles.rowSub}>
-          {hostLabel(h)} ·{' '}
-          {incomplete
-            ? 'faltan credenciales'
-            : h.auth.type === 'password'
-            ? 'contraseña'
-            : 'clave'}
-        </Text>
-      </Pressable>
-    );
-  };
+  const toggleFavorite = (h: Host) =>
+    store.patchHost(h.id, { favorite: !h.favorite }).catch(() => {});
+
+  const renderHost = (h: Host, depth = 0, keyPrefix = '') => (
+    <HostRow
+      key={keyPrefix + h.id}
+      host={h}
+      depth={depth}
+      incomplete={isIncomplete(h, store.keys)}
+      live={liveHosts.has(h.id)}
+      onPress={() => onConnect(h)}
+      onLongPress={() => onEdit(h)}
+      onStar={() => toggleFavorite(h)}
+    />
+  );
 
   const renderFolder = (f: FolderNode, depth: number): React.ReactNode => {
     const closed = isCollapsed(f.path);
@@ -188,10 +183,13 @@ export function HostsScreen({
           ]}
         >
           <Text style={local.chevron}>{closed ? '▸' : '▾'}</Text>
+          <Text style={local.folderIcon}>{closed ? '📁' : '📂'}</Text>
           <Text style={local.folderName} numberOfLines={1}>
-            📁 {f.name}
+            {f.name}
           </Text>
-          <Text style={local.count}>{f.count}</Text>
+          <View style={local.badge}>
+            <Text style={local.badgeText}>{f.count}</Text>
+          </View>
         </Pressable>
         {!closed && renderChildren(f, depth + 1)}
       </View>
@@ -207,47 +205,81 @@ export function HostsScreen({
 
   return (
     <SafeAreaView style={styles.screen}>
-      <Header
-        title="LuloSSH"
-        left={{ label: 'Claves', onPress: onKeys }}
-        right={{ label: '+ Host', onPress: () => onEdit() }}
-      />
-      <ScrollView contentContainerStyle={styles.body}>
+      <View style={local.header}>
+        <Text style={local.brand}>
+          Lulo<Text style={local.brandAccent}>SSH</Text>
+        </Text>
+        <Pressable onPress={onKeys} hitSlop={8} style={local.headerBtn}>
+          <Text style={local.headerBtnText}>🔑 Claves</Text>
+        </Pressable>
+        <Pressable
+          onPress={() => onEdit()}
+          hitSlop={8}
+          style={[local.headerBtn, local.headerBtnPrimary]}
+        >
+          <Text style={[local.headerBtnText, local.headerBtnPrimaryText]}>
+            ＋ Host
+          </Text>
+        </Pressable>
+      </View>
+
+      <ScrollView
+        contentContainerStyle={local.body}
+        keyboardShouldPersistTaps="handled"
+      >
         {store.error && (
           <View>
             <Text style={styles.error}>{store.error}</Text>
             <Button title="Desbloquear" onPress={store.reload} />
           </View>
         )}
+
         {store.hosts.length > 5 && (
-          <Field
-            label="Buscar"
-            value={q}
-            onChangeText={setQ}
-            placeholder="nombre, usuario, host o carpeta"
-          />
+          <View style={local.search}>
+            <Text style={local.searchIcon}>⌕</Text>
+            <TextInput
+              value={q}
+              onChangeText={setQ}
+              placeholder="Buscar por nombre, usuario, host o carpeta"
+              placeholderTextColor="#5b6b7c"
+              autoCapitalize="none"
+              autoCorrect={false}
+              style={local.searchInput}
+            />
+            {searching && (
+              <Pressable onPress={() => setQ('')} hitSlop={8}>
+                <Text style={local.searchClear}>✕</Text>
+              </Pressable>
+            )}
+          </View>
         )}
+
         {store.loaded && store.hosts.length === 0 && (
-          <Text style={styles.empty}>
-            Aún no hay hosts. Pulsa “+ Host” para añadir el primero.
-          </Text>
+          <View style={local.emptyBox}>
+            <Text style={local.emptyIcon}>🍊</Text>
+            <Text style={local.emptyTitle}>Aún no hay hosts</Text>
+            <Text style={styles.rowSub}>
+              Pulsa “＋ Host” para añadir el primero o importa tus sesiones de
+              Xshell.
+            </Text>
+          </View>
         )}
-        {live.length > 0 && (
-          <View>
-            <Text style={styles.section}>Sesiones abiertas</Text>
+
+        {live.length > 0 && !searching && (
+          <Section title="Sesiones abiertas" icon="●" iconColor="#22c55e">
             {live.map(s => (
-              <View key={s.sessionId} style={[styles.row, local.liveRow]}>
+              <View key={s.sessionId} style={[local.card, local.liveCard]}>
                 <Pressable
                   onPress={() => onResume(s)}
                   style={({ pressed }) => [local.liveMain, pressed && local.dim]}
                 >
-                  <Text style={styles.rowTitle} numberOfLines={1}>
-                    <Text style={local.liveDot}>● </Text>
+                  <Text style={local.hostName} numberOfLines={1}>
                     {s.title}
                   </Text>
-                  <Text style={styles.rowSub}>
-                    desde las {new Date(s.startedAt).toLocaleTimeString().slice(0, 5)}{' '}
-                    · toca para volver
+                  <Text style={local.hostSub}>
+                    abierta a las{' '}
+                    {new Date(s.startedAt).toLocaleTimeString().slice(0, 5)} ·
+                    toca para volver
                   </Text>
                 </Pressable>
                 <Pressable
@@ -261,32 +293,61 @@ export function HostsScreen({
                       },
                     ])
                   }
-                  hitSlop={8}
+                  hitSlop={10}
                   accessibilityLabel={`Desconectar ${s.title}`}
                 >
                   <Text style={local.liveClose}>✕</Text>
                 </Pressable>
               </View>
             ))}
-            {store.hosts.length > 0 && (
-              <Text style={styles.section}>Hosts</Text>
-            )}
-          </View>
+          </Section>
         )}
-        {renderChildren(tree, 0)}
+
+        {favs.length > 0 && !searching && (
+          <Section title="Favoritos" icon="★" iconColor="#f5b301">
+            {favs.map(h => renderHost(h, 0, 'fav-'))}
+          </Section>
+        )}
+
+        {freq.length > 0 && !searching && (
+          <Section title="Usados con frecuencia" icon="↻" iconColor="#7fb0ff">
+            {freq.map(h => renderHost(h, 0, 'freq-'))}
+          </Section>
+        )}
+
         {store.hosts.length > 0 && (
-          <Text style={styles.empty}>
-            Mantén pulsado un host para editarlo, o una carpeta para
-            renombrarla o moverla.
+          <Section
+            title={searching ? `Resultados (${filtered.length})` : 'Todos'}
+            icon="≡"
+            iconColor={colors.muted}
+          >
+            {renderChildren(tree, 0)}
+            {searching && filtered.length === 0 && (
+              <Text style={local.hint}>Sin resultados para “{q.trim()}”.</Text>
+            )}
+          </Section>
+        )}
+
+        {store.hosts.length > 0 && (
+          <Text style={local.hint}>
+            ★ marca favoritos · mantén pulsado un host para editarlo, o una
+            carpeta para renombrarla o moverla
           </Text>
         )}
+
         {store.loaded && (
-          <Button
-            title={busy ? 'Importando…' : 'Importar de Xshell'}
-            kind="secondary"
-            disabled={busy}
+          <Pressable
             onPress={importXshell}
-          />
+            disabled={busy}
+            style={({ pressed }) => [
+              local.importBtn,
+              (pressed || busy) && local.dim,
+            ]}
+          >
+            <Text style={local.importText}>
+              {busy ? 'Importando…' : '⇪  Importar de Xshell'}
+            </Text>
+          </Pressable>
         )}
       </ScrollView>
 
@@ -322,21 +383,224 @@ export function HostsScreen({
   );
 }
 
+function Section({
+  title,
+  icon,
+  iconColor,
+  children,
+}: {
+  title: string;
+  icon: string;
+  iconColor: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <View style={local.section}>
+      <View style={local.sectionHead}>
+        <Text style={[local.sectionIcon, { color: iconColor }]}>{icon}</Text>
+        <Text style={local.sectionTitle}>{title}</Text>
+      </View>
+      {children}
+    </View>
+  );
+}
+
+function HostRow({
+  host: h,
+  depth,
+  incomplete,
+  live,
+  onPress,
+  onLongPress,
+  onStar,
+}: {
+  host: Host;
+  depth: number;
+  incomplete: boolean;
+  live: boolean;
+  onPress(): void;
+  onLongPress(): void;
+  onStar(): void;
+}) {
+  const label = h.name || h.host;
+  const tint = colorFor(normPath(h.group) ?? label);
+  return (
+    <Pressable
+      onPress={onPress}
+      onLongPress={onLongPress}
+      style={({ pressed }) => [
+        local.card,
+        local.hostCard,
+        { marginLeft: depth * INDENT },
+        pressed && local.pressed,
+      ]}
+    >
+      <View style={[local.avatar, { backgroundColor: tint + '33' }]}>
+        <Text style={[local.avatarText, { color: tint }]}>
+          {label.slice(0, 1).toUpperCase()}
+        </Text>
+        {live && <View style={local.liveDot} />}
+      </View>
+      <View style={local.hostText}>
+        <Text style={local.hostName} numberOfLines={1}>
+          {label}
+        </Text>
+        <Text style={local.hostSub} numberOfLines={1}>
+          {incomplete ? (
+            <Text style={local.warn}>⚠ faltan credenciales · </Text>
+          ) : (
+            <Text>{h.auth.type === 'password' ? '🔒 ' : '🔑 '}</Text>
+          )}
+          {hostLabel(h)}
+        </Text>
+      </View>
+      <Pressable
+        onPress={onStar}
+        hitSlop={12}
+        accessibilityLabel={h.favorite ? 'Quitar de favoritos' : 'Añadir a favoritos'}
+      >
+        <Text style={[local.star, h.favorite && local.starOn]}>
+          {h.favorite ? '★' : '☆'}
+        </Text>
+      </Pressable>
+    </Pressable>
+  );
+}
+
 const local = StyleSheet.create({
-  folder: {
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+  },
+  brand: { flex: 1, color: '#fff', fontSize: 22, fontWeight: '800' },
+  brandAccent: { color: '#9be22d' },
+  headerBtn: {
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 18,
+    backgroundColor: colors.surface,
+  },
+  headerBtnPrimary: { backgroundColor: colors.accent },
+  headerBtnText: { color: colors.text, fontWeight: '600' },
+  headerBtnPrimaryText: { color: '#fff' },
+  body: { paddingHorizontal: 16, paddingBottom: 32 },
+  search: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: colors.surface,
+    borderRadius: 22,
+    paddingHorizontal: 14,
+    marginBottom: 8,
+  },
+  searchIcon: { color: colors.muted, fontSize: 18, marginRight: 6 },
+  searchInput: { flex: 1, color: colors.text, paddingVertical: 10 },
+  searchClear: { color: colors.muted, fontSize: 16, paddingLeft: 8 },
+  section: { marginTop: 14 },
+  sectionHead: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
-    paddingVertical: 8,
+    marginBottom: 8,
   },
-  chevron: { color: colors.muted, width: 14 },
-  folderName: { flex: 1, color: colors.text, fontWeight: '600' },
-  count: { color: colors.muted },
-  dim: { opacity: 0.6 },
-  liveRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+  sectionIcon: { fontSize: 13, width: 16, textAlign: 'center' },
+  sectionTitle: {
+    color: colors.muted,
+    fontSize: 12,
+    fontWeight: '700',
+    letterSpacing: 0.8,
+    textTransform: 'uppercase',
+  },
+  card: {
+    backgroundColor: colors.surface,
+    borderRadius: 14,
+    marginBottom: 8,
+  },
+  hostCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+  },
+  pressed: { backgroundColor: colors.surface2 },
+  avatar: {
+    width: 40,
+    height: 40,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  avatarText: { fontSize: 18, fontWeight: '800' },
+  liveDot: {
+    position: 'absolute',
+    right: -2,
+    top: -2,
+    width: 12,
+    height: 12,
+    borderRadius: 6,
+    backgroundColor: '#22c55e',
+    borderWidth: 2,
+    borderColor: colors.surface,
+  },
+  hostText: { flex: 1 },
+  hostName: { color: '#fff', fontSize: 16, fontWeight: '600' },
+  hostSub: { color: colors.muted, marginTop: 2, fontSize: 13 },
+  warn: { color: '#f59e0b' },
+  star: { color: '#5b6b7c', fontSize: 22, paddingHorizontal: 4 },
+  starOn: { color: '#f5b301' },
+  folder: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    paddingVertical: 10,
+    paddingHorizontal: 6,
+    marginBottom: 4,
+  },
+  chevron: { color: colors.muted, width: 12, fontSize: 16, textAlign: 'center' },
+  folderIcon: { fontSize: 16 },
+  folderName: { flex: 1, color: colors.text, fontSize: 15, fontWeight: '700' },
+  badge: {
+    minWidth: 24,
+    paddingHorizontal: 7,
+    paddingVertical: 2,
+    borderRadius: 10,
+    backgroundColor: colors.surface2,
+    alignItems: 'center',
+  },
+  badgeText: { color: colors.muted, fontSize: 12, fontWeight: '700' },
+  liveCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    padding: 12,
+    borderLeftWidth: 3,
+    borderLeftColor: '#22c55e',
+  },
   liveMain: { flex: 1 },
-  liveDot: { color: '#22c55e' },
   liveClose: { color: colors.muted, fontSize: 18, paddingHorizontal: 4 },
+  hint: {
+    color: '#5b6b7c',
+    fontSize: 12,
+    textAlign: 'center',
+    marginTop: 16,
+  },
+  emptyBox: { alignItems: 'center', marginTop: 48, gap: 6 },
+  emptyIcon: { fontSize: 40 },
+  emptyTitle: { color: '#fff', fontSize: 18, fontWeight: '700' },
+  importBtn: {
+    marginTop: 16,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: colors.surface2,
+    borderStyle: 'dashed',
+    padding: 14,
+    alignItems: 'center',
+  },
+  importText: { color: colors.muted, fontWeight: '600' },
+  dim: { opacity: 0.6 },
   backdrop: {
     flex: 1,
     backgroundColor: 'rgba(0,0,0,0.6)',

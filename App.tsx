@@ -132,7 +132,12 @@ export default function App() {
       return;
     }
     const open = () => {
-      store.patchHost(h.id, { lastUsedAt: Date.now() }).catch(() => {});
+      store
+        .patchHost(h.id, {
+          lastUsedAt: Date.now(),
+          useCount: (h.useCount ?? 0) + 1,
+        })
+        .catch(() => {});
       setRoute({
         name: 'terminal',
         host: h,

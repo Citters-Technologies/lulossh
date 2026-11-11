@@ -3,6 +3,7 @@
  * "Clientes/Acme/Web"; se aceptan también rutas antiguas con " / ".
  */
 import type { Host } from './models';
+import { compareText } from './ranking';
 
 export const splitPath = (group?: string): string[] =>
   (group ?? '')
@@ -58,7 +59,7 @@ export function buildTree(
     node.hosts.push(h);
   }
   const sortRec = (n: FolderNode) => {
-    n.folders.sort((a, b) => a.name.localeCompare(b.name));
+    n.folders.sort((a, b) => compareText(a.name, b.name));
     n.hosts.sort(sortHosts);
     n.folders.forEach(sortRec);
   };
