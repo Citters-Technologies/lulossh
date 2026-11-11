@@ -7,8 +7,11 @@
  * - Claves: Xshell las guarda en un formato propio; hay que exportarlas desde
  *   su gestor de claves (formato PEM/OpenSSH). Se asocian por nombre con el
  *   campo UserKey de cada sesión.
- * - Las contraseñas no se importan: Xshell las cifra con datos de la cuenta
- *   de Windows.
+ * - Contraseñas: van cifradas en el campo `Password=` de cada .xsh. Si el
+ *   export se hizo con contraseña maestra (xts.zcf: Master=1), se pueden
+ *   descifrar pidiéndosela al usuario (ver decryptXshellPasswords en nativo).
+ *   Sin contraseña maestra, Xshell las liga a la cuenta de Windows y no son
+ *   portables.
  */
 
 import type { ImportEntry } from '../native/SshModule';
@@ -21,6 +24,10 @@ export interface ImportedHost {
   username: string;
   /** Nombre de la clave en Xshell (UserKey), si la sesión usa clave. */
   keyName?: string;
+  /** Blob base64 de la contraseña cifrada (campo Password=), si la trae. */
+  encPassword?: string;
+  /** Contraseña ya descifrada con la contraseña maestra (se rellena luego). */
+  password?: string;
 }
 
 export interface ImportedKey {
@@ -93,6 +100,7 @@ export function parseXsh(path: string, text: string): ImportedHost | string {
   const keyName = (auth.UserKey ?? '').trim();
   const usesKey =
     keyName !== '' && (auth.Method === undefined || auth.Method === '1');
+  const encPassword = (auth.Password ?? '').trim();
   return {
     name: stripExt(baseName(path)),
     group: groupFromPath(path),
@@ -100,6 +108,7 @@ export function parseXsh(path: string, text: string): ImportedHost | string {
     port: Number.isInteger(port) && port > 0 && port < 65536 ? port : 22,
     username: (auth.UserName ?? '').trim(),
     keyName: usesKey ? keyName : undefined,
+    encPassword: !usesKey && encPassword ? encPassword : undefined,
   };
 }
 

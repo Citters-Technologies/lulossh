@@ -49,6 +49,18 @@ test('sesión con contraseña no lleva clave aunque tenga UserKey', () => {
   expect(typeof h !== 'string' && h.keyName).toBeUndefined();
 });
 
+test('sesión con contraseña expone el blob cifrado (Password=)', () => {
+  const h = parseXsh('a.xsh', XSH.replace('Method=1', 'Method=0'));
+  expect(typeof h !== 'string' && h.encPassword).toBe(
+    'dGhpcyBpcyBlbmNyeXB0ZWQ=',
+  );
+});
+
+test('sesión por clave no expone el blob de contraseña', () => {
+  const h = parseXsh('a.xsh', XSH); // Method=1
+  expect(typeof h !== 'string' && h.encPassword).toBeUndefined();
+});
+
 test('ignora protocolos que no son SSH', () => {
   expect(parseXsh('t.xsh', XSH.replace('Protocol=SSH', 'Protocol=TELNET'))).toMatch(
     /TELNET/,

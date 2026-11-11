@@ -133,6 +133,17 @@ export interface SshModuleSpec {
   /** Descifra una copia (falla con code 'BAD_PASSWORD'). Devuelve JSON. */
   decryptBackup(content: string, password: string): Promise<string>;
 
+  /**
+   * Descifra las contraseñas de sesiones de Xshell (campo Password= de los
+   * .xsh) con la contraseña maestra del usuario. Devuelve un array paralelo a
+   * `blobs`: el texto plano, o null si la contraseña maestra no cuadra o el
+   * formato no se reconoce (lleva un sello SHA-256 que lo garantiza).
+   */
+  decryptXshellPasswords(
+    master: string,
+    blobs: string[],
+  ): Promise<(string | null)[]>;
+
   /** Portapapeles del sistema. */
   copyText(text: string): void;
   pasteText(): Promise<string | null>;

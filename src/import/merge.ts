@@ -86,7 +86,7 @@ export function planImport(
         importedKeyName: h.keyName,
         auth: keyId
           ? { type: 'privateKey', keyId }
-          : { type: 'password', password: '' },
+          : { type: 'password', password: h.password ?? '' },
       });
       continue;
     }
@@ -97,6 +97,9 @@ export function planImport(
     if (isIncomplete(match, keys, identities) && keyId) {
       patch.auth = { type: 'privateKey', keyId };
       changes.push(`clave ${h.keyName}`);
+    } else if (isIncomplete(match, keys, identities) && h.password) {
+      patch.auth = { type: 'password', password: h.password };
+      changes.push('contraseña');
     }
     if (!match.username && h.username) {
       patch.username = h.username;

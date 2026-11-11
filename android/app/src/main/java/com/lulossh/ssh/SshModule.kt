@@ -238,6 +238,31 @@ class SshModule(private val rc: ReactApplicationContext) : ReactContextBaseJavaM
         }
     }
 
+    /**
+     * Descifra las contraseñas de sesiones de Xshell (campo Password=) con la
+     * contraseña maestra del usuario. `blobs` son los base64 tal cual vienen en
+     * los .xsh; devuelve un array paralelo con el texto plano o null por cada
+     * uno (null = contraseña maestra incorrecta o formato no soportado). No
+     * toca el vault ni la red; es cálculo puro.
+     */
+    @ReactMethod
+    fun decryptXshellPasswords(master: String, blobs: com.facebook.react.bridge.ReadableArray, promise: Promise) {
+        pool.execute {
+            try {
+                val keys = XshellCrypto.keysFromMaster(master)
+                val out = Arguments.createArray()
+                for (i in 0 until blobs.size()) {
+                    val blob = blobs.getString(i)
+                    val plain = if (blob.isNullOrBlank()) null else XshellCrypto.decrypt(blob, keys)
+                    if (plain == null) out.pushNull() else out.pushString(plain)
+                }
+                promise.resolve(out)
+            } catch (e: Exception) {
+                promise.reject("XSHELL_DECRYPT_ERROR", e.message, e)
+            }
+        }
+    }
+
     private val fileImport by lazy { FileImport(rc) }
 
     /** Selector de ficheros para importar; resuelve con [{path, text}] ([] si se cancela). */

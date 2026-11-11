@@ -77,6 +77,31 @@ test('reimportar completa hosts huérfanos con la clave que ahora sí llega', ()
   expect(plan.toUpdate[0].changes).toEqual(['clave id_prod', 'carpeta Prod']);
 });
 
+test('la contraseña descifrada entra en hosts nuevos y completa huérfanos', () => {
+  const orphan = host({
+    id: 'o',
+    name: 'web',
+    auth: { type: 'password', password: '' },
+  });
+  const plan = planImport(
+    [orphan],
+    [],
+    [
+      // Host existente incompleto: se completa con la contraseña.
+      { name: 'web', host: '10.0.0.1', port: 22, username: 'root', password: 's3cr3t' },
+      // Host nuevo con contraseña descifrada.
+      { name: 'new', host: '10.0.0.9', port: 22, username: 'root', password: 'pw9' },
+    ],
+    () => 'new-id',
+  );
+  expect(plan.toAdd[0].auth).toEqual({ type: 'password', password: 'pw9' });
+  expect(plan.toUpdate[0].patch.auth).toEqual({
+    type: 'password',
+    password: 's3cr3t',
+  });
+  expect(plan.toUpdate[0].changes).toEqual(['contraseña']);
+});
+
 test('no toca hosts completos aunque cambie la clave en el origen', () => {
   const plan = planImport(
     [host({ id: 'a' })],
