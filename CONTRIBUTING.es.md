@@ -6,12 +6,12 @@
 
 ## Acuerdo de contribuidor (CLA)
 
-LuloSSH, titularidad de Citters Technologies SL, se publica bajo AGPL-3.0 y
+LuloSSH, titularidad de Citters Technologies SLU, se publica bajo AGPL-3.0 y
 también se ofrece con licencia comercial.
 Para poder hacerlo, al abrir un pull request aceptas que:
 
 1. Eres el autor del código aportado o tienes derecho a aportarlo.
-2. Concedes a Citters Technologies SL (y a quien esta designe) una licencia perpetua, mundial y
+2. Concedes a Citters Technologies SLU (y a quien esta designe) una licencia perpetua, mundial y
    gratuita para usar, modificar y distribuir tu contribución, incluida su
    redistribución bajo otras licencias (como la comercial).
 3. Conservas la autoría de tu código.
