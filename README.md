@@ -1,38 +1,55 @@
 # LuloSSH
 
-Cliente SSH para Android (y más adelante iOS), pensado para trabajar en consola
-desde el móvil: claves guardadas de forma segura, sincronización cifrada entre
-dispositivos y una barra de teclas propia, con una capa para CLIs de IA
-(Claude Code y similares).
+**English** · [Español](README.es.md)
 
-> Estado: en desarrollo temprano. Aún no hay versión usable.
+An SSH client for Android (iOS later), built for real terminal work from your
+phone: securely stored keys, end-to-end encrypted sync across devices, and a
+custom terminal key bar with a dedicated layer for AI coding CLIs
+(Claude Code and similar).
 
-## Características previstas
+> Status: early development. Not usable yet.
 
-- Conexión SSH con contraseña o clave (ed25519, RSA, ECDSA).
-- Claves privadas cifradas con Android Keystore (Keychain en iOS), con biometría.
-- Sincronización de hosts y claves por archivo cifrado de extremo a extremo
-  (Google Drive `appDataFolder`; la contraseña maestra nunca sale del dispositivo).
-- Terminal completa (xterm.js) y barra de teclas editable por capas.
-- Capa "IA": Esc Esc, Shift+Tab, Ctrl+C/D/R, `/`, `@`, `#`, respuestas rápidas.
+## Why LuloSSH exists
 
-## Arquitectura
+For years, JuiceSSH was our everyday tool for managing servers from a phone.
+We were sad to see the project discontinued: we miss it, especially its
+terminal keyboard, which made working in a shell on a touchscreen genuinely
+comfortable.
 
-| Capa | Tecnología |
+LuloSSH is our attempt to bring that experience back, this time as free
+software so it can't disappear, and adapted to how we work today: more and
+more alongside AI assistants in the terminal.
+
+> LuloSSH is an independent project. It is not affiliated with, associated
+> with, or endorsed by JuiceSSH or Sonelli Ltd. It contains no JuiceSSH code.
+
+## Planned features
+
+- SSH with password or key authentication (ed25519, RSA, ECDSA).
+- Private keys encrypted with the Android Keystore (Keychain on iOS),
+  unlocked with biometrics or the device PIN.
+- Host and key sync through an end-to-end encrypted file (Google Drive
+  `appDataFolder`); the master password never leaves the device.
+- Full terminal emulation (xterm.js) and a layered, editable key bar.
+- "AI" layer: Esc Esc, Shift+Tab, Ctrl+C/D/R, `/`, `@`, `#`, quick replies.
+
+## Architecture
+
+| Layer | Technology |
 | --- | --- |
-| UI y lógica | React Native + TypeScript |
-| SSH | Módulo nativo: Kotlin + sshj (Android); Swift (iOS, pendiente) |
-| Terminal | xterm.js en WebView |
-| Claves | Android Keystore / iOS Keychain |
-| Sync | Archivo cifrado (AES-GCM, clave derivada con Argon2) |
+| UI and logic | React Native + TypeScript |
+| SSH | Native module: Kotlin + sshj (Android); Swift (iOS, planned) |
+| Terminal | xterm.js in a WebView |
+| Keys | Android Keystore / iOS Keychain |
+| Sync | Encrypted file (AES-GCM, Argon2-derived key) |
 
-El contrato del módulo nativo está en `src/native/SshModule.ts`; cada
-plataforma lo implementa por separado.
+The native module contract lives in `src/native/SshModule.ts`; each platform
+implements it separately.
 
-## Desarrollo
+## Development
 
-Requisitos: Node 22+, JDK 17 y Android Studio (SDK). Ver la
-[guía de entorno de React Native](https://reactnative.dev/docs/set-up-your-development-environment).
+Requirements: Node 22+, JDK 17 and the Android SDK. See the
+[React Native environment setup guide](https://reactnative.dev/docs/set-up-your-development-environment).
 
 ```sh
 npm install
@@ -40,24 +57,23 @@ npm test
 npm run android
 ```
 
-## Licencia
+## License
 
 Copyright (C) 2026 Citters Technologies SL
 
-LuloSSH se distribuye bajo la **GNU Affero General Public License v3.0**
-(ver [LICENSE](LICENSE)). Puedes usarlo, modificarlo y redistribuirlo, pero
-cualquier versión modificada, incluida la que se ofrezca como servicio en red,
-debe publicarse bajo la misma licencia, conservando los avisos de copyright.
+LuloSSH is distributed under the **GNU Affero General Public License v3.0**
+(see [LICENSE](LICENSE)). You may use, modify and redistribute it, but any
+modified version, including one offered as a network service, must be
+released under the same license, keeping the copyright notices.
 
-### Licencia comercial
+### Commercial license
 
-Si quieres integrar LuloSSH en un producto propietario o cerrado sin las
-obligaciones de la AGPL, puedes adquirir una licencia comercial.
-Contacto: hola@citters.com
+If you want to embed LuloSSH in a proprietary or closed-source product
+without the AGPL obligations, a commercial license is available.
+Contact: hola@citters.com
 
-### Contribuciones
+### Contributing
 
-Para poder ofrecer la licencia comercial, las contribuciones externas
-requieren aceptar un acuerdo de licencia de contribuidor (CLA) que permita
-a los titulares del proyecto relicenciar el código aportado.
-Ver [CONTRIBUTING.md](CONTRIBUTING.md).
+To be able to offer the commercial license, external contributions require
+accepting a Contributor License Agreement (CLA) that allows the project
+owners to relicense contributed code. See [CONTRIBUTING.md](CONTRIBUTING.md).

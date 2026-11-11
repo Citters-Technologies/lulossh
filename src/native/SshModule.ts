@@ -9,7 +9,8 @@ import { NativeEventEmitter, NativeModules } from 'react-native';
 
 export type AuthMethod =
   | { type: 'password'; password: string }
-  | { type: 'privateKey'; keyId: string; passphrase?: string };
+  /** La clave privada y su passphrase se leen del vault en nativo. */
+  | { type: 'privateKey'; keyId: string };
 
 export interface ConnectOptions {
   host: string;
@@ -39,9 +40,33 @@ export interface SshModuleSpec {
   resize(sessionId: string, cols: number, rows: number): Promise<void>;
   disconnect(sessionId: string): Promise<void>;
   acceptHostKey(sessionId: string, accept: boolean): Promise<void>;
-  /** Guarda la clave privada (PEM/OpenSSH) cifrada en Keystore/Keychain. */
-  importKey(keyId: string, pem: string): Promise<void>;
+
+  /**
+   * Vault cifrado (Keystore/Keychain). Si el usuario no se ha autenticado
+   * recientemente, las llamadas fallan con code === 'LOCKED': llamar a unlock().
+   */
+  unlock(reason: string): Promise<void>;
+  secureGet(name: string): Promise<string | null>;
+  secureSet(name: string, value: string): Promise<void>;
+  secureDelete(name: string): Promise<void>;
+
+  /** Genera un par ed25519; la privada se queda en el vault. */
+  generateKey(keyId: string, comment: string): Promise<KeyInfo>;
+  /** Valida y guarda una clave PEM/OpenSSH (y su passphrase, si tiene). */
+  importKey(
+    keyId: string,
+    pem: string,
+    passphrase: string | null,
+    comment: string,
+  ): Promise<KeyInfo>;
   deleteKey(keyId: string): Promise<void>;
+}
+
+export interface KeyInfo {
+  /** ssh-ed25519, ssh-rsa, ecdsa-sha2-nistp256… */
+  type: string;
+  /** Línea lista para authorized_keys. */
+  publicKey: string;
 }
 
 const native = NativeModules.LuloSsh as SshModuleSpec | undefined;

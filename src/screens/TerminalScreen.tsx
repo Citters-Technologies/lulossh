@@ -15,19 +15,22 @@ import {
   Modifier,
   ModifierState,
 } from '../keyboard/model';
-import { ConnectOptions, Ssh, sshEvents, toBase64 } from '../native/SshModule';
+import { Ssh, sshEvents, toBase64 } from '../native/SshModule';
+import { Host, hostLabel } from '../store/models';
+import { withUnlock } from '../store/vault';
 import { TerminalHandle, TerminalView } from '../terminal/TerminalView';
-
-type Params = Omit<ConnectOptions, 'cols' | 'rows'>;
 
 const NO_MODS: ModifierState = { ctrl: false, alt: false, shift: false };
 
 export function TerminalScreen({
-  params,
+  host,
   onClose,
+  onHostKeyAccepted,
 }: {
-  params: Params;
+  host: Host;
   onClose(): void;
+  /** Para guardar la huella y no volver a preguntar. */
+  onHostKeyAccepted(fingerprint: string): void;
 }) {
   const term = useRef<TerminalHandle>(null);
   const sessionId = useRef<string | null>(null);
@@ -70,6 +73,9 @@ export function TerminalScreen({
     send(out);
   };
 
+  const acceptedRef = useRef(onHostKeyAccepted);
+  acceptedRef.current = onHostKeyAccepted;
+
   const handleEvent = useCallback((event: string, p: any) => {
     if (p.sessionId !== sessionId.current) {
       return;
@@ -81,7 +87,10 @@ export function TerminalScreen({
     } else if (event === 'hostKey') {
       Alert.alert(
         p.changed ? '⚠ La huella del host ha cambiado' : 'Host nuevo',
-        `Huella:\n${p.fingerprint}\n\n¿Confiar y continuar?`,
+        (p.changed
+          ? 'Puede ser una reinstalación del servidor o un ataque ' +
+            '(man-in-the-middle). No continúes si no lo esperabas.\n\n'
+          : '') + `Huella:\n${p.fingerprint}\n\n¿Confiar y continuar?`,
         [
           {
             text: 'Cancelar',
@@ -90,7 +99,11 @@ export function TerminalScreen({
           },
           {
             text: 'Confiar',
-            onPress: () => Ssh.acceptHostKey(p.sessionId, true),
+            style: p.changed ? 'destructive' : 'default',
+            onPress: () => {
+              acceptedRef.current(p.fingerprint);
+              Ssh.acceptHostKey(p.sessionId, true);
+            },
           },
         ],
         { cancelable: false },
@@ -120,7 +133,18 @@ export function TerminalScreen({
 
   const onReady = async (size: { cols: number; rows: number }) => {
     try {
-      const id = await Ssh.connect({ ...params, ...size });
+      const id = await withUnlock(
+        () =>
+          Ssh.connect({
+            host: host.host,
+            port: host.port,
+            username: host.username,
+            auth: host.auth,
+            knownHostFingerprint: host.fingerprint,
+            ...size,
+          }),
+        `Conectar a ${host.name}`,
+      );
       sessionId.current = id;
       setStatus('Conectado');
       queue.current.splice(0).forEach(q => handleEvent(q.event, q.payload));
@@ -139,8 +163,8 @@ export function TerminalScreen({
   return (
     <SafeAreaView style={styles.root}>
       <View style={styles.header}>
-        <Text style={styles.title}>
-          {params.username}@{params.host}
+        <Text style={styles.title} numberOfLines={1}>
+          {host.name} · {hostLabel(host)}
         </Text>
         <Text style={styles.status} onPress={onClose}>
           {status} · Cerrar

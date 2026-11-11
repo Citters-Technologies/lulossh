@@ -1,28 +1,32 @@
-# Contribuir a LuloSSH
+# Contributing to LuloSSH
 
-¡Gracias por querer ayudar!
+**English** · [Español](CONTRIBUTING.es.md)
 
-## Acuerdo de contribuidor (CLA)
+Thanks for wanting to help!
 
-LuloSSH, titularidad de Citters Technologies SL, se publica bajo AGPL-3.0 y
-también se ofrece con licencia comercial.
-Para poder hacerlo, al abrir un pull request aceptas que:
+## Contributor License Agreement (CLA)
 
-1. Eres el autor del código aportado o tienes derecho a aportarlo.
-2. Concedes a Citters Technologies SL (y a quien esta designe) una licencia perpetua, mundial y
-   gratuita para usar, modificar y distribuir tu contribución, incluida su
-   redistribución bajo otras licencias (como la comercial).
-3. Conservas la autoría de tu código.
+LuloSSH, owned by Citters Technologies SL, is released under the AGPL-3.0
+and is also offered under a commercial license.
+To make that possible, by opening a pull request you agree that:
 
-Indica en la descripción del PR: "Acepto el CLA de CONTRIBUTING.md".
+1. You are the author of the contributed code or have the right to
+   contribute it.
+2. You grant Citters Technologies SL (and anyone it designates) a perpetual,
+   worldwide, royalty-free license to use, modify and distribute your
+   contribution, including redistributing it under other licenses (such as
+   the commercial one).
+3. You keep authorship of your code.
 
-## Normas básicas
+State in the PR description: "I accept the CLA in CONTRIBUTING.md".
 
-- Ejecuta `npm test` y `npm run lint` antes de enviar el PR.
-- Los cambios en cifrado, claves o sincronización deben explicar su modelo de
-  amenazas en la descripción.
-- No copies código de proyectos con licencias incompatibles con AGPL o con la
-  relicencia comercial.
+## Ground rules
 
-> Nota para los titulares: este texto es una plantilla. Conviene que un
-> abogado lo revise antes de aceptar contribuciones externas.
+- Run `npm test` and `npm run lint` before submitting a PR.
+- Changes to encryption, key handling or sync must describe their threat
+  model in the PR description.
+- Do not copy code from projects whose licenses are incompatible with the
+  AGPL or with commercial relicensing.
+
+> Note for the owners: this text is a template. Have a lawyer review it
+> before accepting external contributions.

@@ -45,20 +45,75 @@ class SshModule(private val rc: ReactApplicationContext) : ReactContextBaseJavaM
     @ReactMethod fun addListener(eventName: String) {}
     @ReactMethod fun removeListeners(count: Int) {}
 
-    @ReactMethod
-    fun importKey(keyId: String, pem: String, promise: Promise) {
-        try {
-            vault.save(keyId, pem)
-            promise.resolve(null)
-        } catch (e: Exception) {
-            promise.reject("KEY_ERROR", e)
+    /** Ejecuta en background; VaultLockedException -> código "LOCKED" para que JS pida unlock(). */
+    private fun vaultCall(promise: Promise, block: () -> Any?) {
+        pool.execute {
+            try {
+                promise.resolve(block())
+            } catch (e: VaultLockedException) {
+                promise.reject("LOCKED", "Vault bloqueado", e)
+            } catch (e: Exception) {
+                promise.reject("VAULT_ERROR", e.message, e)
+            }
         }
     }
 
     @ReactMethod
-    fun deleteKey(keyId: String, promise: Promise) {
-        vault.delete(keyId)
-        promise.resolve(null)
+    fun unlock(reason: String, promise: Promise) {
+        val activity = rc.currentActivity as? androidx.fragment.app.FragmentActivity
+            ?: return promise.reject("NO_ACTIVITY", "No hay actividad en primer plano")
+        activity.runOnUiThread {
+            BiometricUnlock.prompt(activity, "Desbloquear LuloSSH", reason) { ok, err ->
+                if (ok) promise.resolve(null) else promise.reject("UNLOCK_FAILED", err ?: "Cancelado")
+            }
+        }
+    }
+
+    @ReactMethod
+    fun secureGet(name: String, promise: Promise) =
+        vaultCall(promise) { vault.get(KeyVault.valueName(name)) }
+
+    @ReactMethod
+    fun secureSet(name: String, value: String, promise: Promise) =
+        vaultCall(promise) { vault.put(KeyVault.valueName(name), value); null }
+
+    @ReactMethod
+    fun secureDelete(name: String, promise: Promise) =
+        vaultCall(promise) { vault.delete(KeyVault.valueName(name)); null }
+
+    @ReactMethod
+    fun generateKey(keyId: String, comment: String, promise: Promise) = vaultCall(promise) {
+        val g = KeyTools.generateEd25519(comment)
+        vault.put(KeyVault.privateKeyName(keyId), g.privatePem)
+        Arguments.createMap().apply {
+            putString("type", "ssh-ed25519")
+            putString("publicKey", g.publicKey)
+        }
+    }
+
+    /** Valida la clave (y la passphrase) antes de guardarla; devuelve la pública. */
+    @ReactMethod
+    fun importKey(keyId: String, pem: String, passphrase: String?, comment: String, promise: Promise) =
+        vaultCall(promise) {
+            val kp = try {
+                KeyTools.load(pem, passphrase)
+            } catch (e: Exception) {
+                throw IllegalArgumentException("Clave no válida o passphrase incorrecta", e)
+            }
+            val pub = kp.public
+            vault.put(KeyVault.privateKeyName(keyId), pem)
+            if (!passphrase.isNullOrEmpty()) vault.put(KeyVault.passphraseName(keyId), passphrase)
+            Arguments.createMap().apply {
+                putString("type", net.schmizz.sshj.common.KeyType.fromKey(pub).toString())
+                putString("publicKey", KeyTools.publicKeyLine(pub, comment))
+            }
+        }
+
+    @ReactMethod
+    fun deleteKey(keyId: String, promise: Promise) = vaultCall(promise) {
+        vault.delete(KeyVault.privateKeyName(keyId))
+        vault.delete(KeyVault.passphraseName(keyId))
+        null
     }
 
     @ReactMethod
@@ -90,12 +145,11 @@ class SshModule(private val rc: ReactApplicationContext) : ReactContextBaseJavaM
                 when (auth.getString("type")) {
                     "password" -> client.authPassword(user, auth.getString("password"))
                     "privateKey" -> {
-                        val pem = vault.load(auth.getString("keyId")!!)
+                        val keyId = auth.getString("keyId")!!
+                        val pem = vault.get(KeyVault.privateKeyName(keyId))
                             ?: throw IllegalStateException("Clave no encontrada")
-                        val pass = if (auth.hasKey("passphrase")) auth.getString("passphrase") else null
-                        val kp = if (pass.isNullOrEmpty()) client.loadKeys(pem, null, null)
-                        else client.loadKeys(pem, null, net.schmizz.sshj.userauth.password.PasswordUtils.createOneOff(pass.toCharArray()))
-                        client.authPublickey(user, kp)
+                        val pass = vault.get(KeyVault.passphraseName(keyId))
+                        client.authPublickey(user, KeyTools.load(pem, pass))
                     }
                     else -> throw IllegalArgumentException("Método de auth desconocido")
                 }
@@ -107,6 +161,8 @@ class SshModule(private val rc: ReactApplicationContext) : ReactContextBaseJavaM
                 sessions[id] = Sess(client, shell, session)
                 pump(id, shell)
                 promise.resolve(id)
+            } catch (e: VaultLockedException) {
+                promise.reject("LOCKED", "Vault bloqueado", e)
             } catch (e: Exception) {
                 promise.reject("CONNECT_ERROR", e.message, e)
             }
