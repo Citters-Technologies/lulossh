@@ -157,6 +157,7 @@ export function SettingsScreen({
         <Text style={styles.section}>Seguridad</Text>
         <View style={local.card}>
           <View style={local.line}>
+            <Text style={local.icon}>🔐</Text>
             <View style={local.lineText}>
               <Text style={local.title}>Bloquear con huella o PIN</Text>
               <Text style={local.sub}>
@@ -185,13 +186,13 @@ export function SettingsScreen({
 
         <Text style={styles.section}>Copia de seguridad</Text>
         <Item
-          icon="⬆"
+          icon="📤"
           title="Exportar copia cifrada"
           sub={`Hosts, identidades, claves privadas y ajustes, protegidos con una contraseña. ${store.hosts.length} hosts · ${store.identities.length} identidades · ${store.keys.length} claves`}
           onPress={() => setPw({ mode: 'export', a: '', b: '' })}
         />
         <Item
-          icon="⬇"
+          icon="📥"
           title="Restaurar copia"
           sub="Añade lo que falte desde un fichero .lulossh (no borra nada)"
           onPress={pickBackup}
@@ -199,7 +200,7 @@ export function SettingsScreen({
 
         <Text style={styles.section}>Terminal</Text>
         <Item
-          icon="⌨"
+          icon="⌨️"
           title="Botonera de teclas"
           sub="Añade, quita y ordena las teclas de encima del teclado"
           onPress={onEditKeyBar}
