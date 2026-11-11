@@ -17,6 +17,32 @@ import java.security.SecureRandom
 
 object KeyTools {
 
+    /**
+     * Autenticación por contraseña probando "password" y, si el servidor no lo
+     * permite, "keyboard-interactive" (por defecto en muchos sshd modernos).
+     * Responde con la contraseña a cualquier pregunta sin eco, sea cual sea el
+     * texto del prompt ("Password:", "Contraseña:", "Password for x@y:"…).
+     */
+    fun authPasswordOrInteractive(client: SSHClient, user: String, password: String) {
+        val finder = object : net.schmizz.sshj.userauth.password.PasswordFinder {
+            override fun reqPassword(resource: net.schmizz.sshj.userauth.password.Resource<*>?) =
+                password.toCharArray()
+            override fun shouldRetry(resource: net.schmizz.sshj.userauth.password.Resource<*>?) = false
+        }
+        val interactive = object : net.schmizz.sshj.userauth.method.ChallengeResponseProvider {
+            override fun getSubmethods(): List<String> = emptyList()
+            override fun init(resource: net.schmizz.sshj.userauth.password.Resource<*>?, name: String?, instruction: String?) {}
+            override fun getResponse(prompt: String?, echo: Boolean): CharArray =
+                if (echo) CharArray(0) else password.toCharArray()
+            override fun shouldRetry() = false
+        }
+        client.auth(
+            user,
+            net.schmizz.sshj.userauth.method.AuthPassword(finder),
+            net.schmizz.sshj.userauth.method.AuthKeyboardInteractive(interactive),
+        )
+    }
+
     data class Generated(val privatePem: String, val publicKey: String)
 
     /** Genera un par ed25519 en formato OpenSSH (sin cifrar: lo cifra el vault). */

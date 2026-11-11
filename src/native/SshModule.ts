@@ -13,6 +13,11 @@ export type AuthMethod =
   | { type: 'privateKey'; keyId: string };
 
 export interface ConnectOptions {
+  /**
+   * Id de sesión generado por JS. Permite atender eventos (hostKey) antes de
+   * que connect() resuelva, que espera a que el usuario acepte la huella.
+   */
+  sessionId: string;
   host: string;
   port: number;
   username: string;
@@ -35,7 +40,8 @@ export interface SshSessionEvents {
 }
 
 export interface SshModuleSpec {
-  connect(options: ConnectOptions): Promise<string>; // sessionId
+  /** Resuelve con el mismo sessionId de options cuando la shell está lista. */
+  connect(options: ConnectOptions): Promise<string>;
   write(sessionId: string, base64: string): Promise<void>;
   resize(sessionId: string, cols: number, rows: number): Promise<void>;
   disconnect(sessionId: string): Promise<void>;

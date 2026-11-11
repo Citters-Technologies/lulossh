@@ -17,7 +17,7 @@ import {
 } from '../keyboard/model';
 import { Ssh, sshEvents, toBase64 } from '../native/SshModule';
 import { Host, hostLabel } from '../store/models';
-import { withUnlock } from '../store/vault';
+import { newId, withUnlock } from '../store/vault';
 import { TerminalHandle, TerminalView } from '../terminal/TerminalView';
 
 const NO_MODS: ModifierState = { ctrl: false, alt: false, shift: false };
@@ -33,15 +33,18 @@ export function TerminalScreen({
   onHostKeyAccepted(fingerprint: string): void;
 }) {
   const term = useRef<TerminalHandle>(null);
-  const sessionId = useRef<string | null>(null);
-  const queue = useRef<{ event: string; payload: any }[]>([]);
+  // El id lo generamos aquí (no el nativo) para poder atender eventos como
+  // hostKey mientras connect() todavía no ha terminado.
+  const sessionId = useRef(newId());
+  const connected = useRef(false);
+  const started = useRef(false);
   const [status, setStatus] = useState('Conectando…');
   const [mods, setMods] = useState<ModifierState>(NO_MODS);
   const modsRef = useRef(mods);
   modsRef.current = mods;
 
   const send = useCallback((data: string) => {
-    if (sessionId.current) {
+    if (connected.current) {
       Ssh.write(sessionId.current, toBase64(data)).catch(() => {});
     }
   }, []);
@@ -83,6 +86,7 @@ export function TerminalScreen({
     if (event === 'data') {
       term.current?.write(p.base64);
     } else if (event === 'closed') {
+      connected.current = false;
       setStatus('Desconectado' + (p.reason ? `: ${p.reason}` : ''));
     } else if (event === 'hostKey') {
       Alert.alert(
@@ -112,30 +116,27 @@ export function TerminalScreen({
   }, []);
 
   useEffect(() => {
-    // connect() devuelve el sessionId después de que ya puedan llegar eventos
-    // (hostKey, data): se encolan hasta conocerlo y luego se procesan.
     const subs = (['data', 'closed', 'hostKey', 'error'] as const).map(ev =>
-      sshEvents.addListener(ev, (p: any) => {
-        if (sessionId.current) {
-          handleEvent(ev, p);
-        } else {
-          queue.current.push({ event: ev, payload: p });
-        }
-      }),
+      sshEvents.addListener(ev, (p: any) => handleEvent(ev, p)),
     );
+    const id = sessionId.current;
     return () => {
       subs.forEach(s => s.remove());
-      if (sessionId.current) {
-        Ssh.disconnect(sessionId.current).catch(() => {});
-      }
+      // También aborta una conexión a medias (p. ej. esperando la huella).
+      Ssh.disconnect(id).catch(() => {});
     };
   }, [handleEvent]);
 
   const onReady = async (size: { cols: number; rows: number }) => {
+    if (started.current) {
+      return; // el WebView puede recargarse; no reconectar en silencio
+    }
+    started.current = true;
     try {
-      const id = await withUnlock(
+      await withUnlock(
         () =>
           Ssh.connect({
+            sessionId: sessionId.current,
             host: host.host,
             port: host.port,
             username: host.username,
@@ -145,17 +146,19 @@ export function TerminalScreen({
           }),
         `Conectar a ${host.name}`,
       );
-      sessionId.current = id;
+      connected.current = true;
       setStatus('Conectado');
-      queue.current.splice(0).forEach(q => handleEvent(q.event, q.payload));
       term.current?.focus();
     } catch (e: any) {
-      setStatus(`Error: ${e?.message ?? e}`);
+      const msg = e?.message ?? String(e);
+      setStatus('Error');
+      // Mostrarlo también en la terminal, que es donde mira el usuario.
+      term.current?.write(toBase64(`\r\n\x1b[31m✖ ${msg}\x1b[0m\r\n`));
     }
   };
 
   const onResize = (size: { cols: number; rows: number }) => {
-    if (sessionId.current) {
+    if (connected.current) {
       Ssh.resize(sessionId.current, size.cols, size.rows).catch(() => {});
     }
   };

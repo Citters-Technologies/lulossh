@@ -27,6 +27,7 @@ class SshModule(private val rc: ReactApplicationContext) : ReactContextBaseJavaM
 
     private val sessions = ConcurrentHashMap<String, Sess>()
     private val pendingHostKeys = ConcurrentHashMap<String, CompletableFuture<Boolean>>()
+    private val connecting = ConcurrentHashMap<String, SSHClient>()
     private val pool = Executors.newCachedThreadPool()
     private val vault by lazy { KeyVault(rc) }
 
@@ -116,12 +117,22 @@ class SshModule(private val rc: ReactApplicationContext) : ReactContextBaseJavaM
         null
     }
 
+    /**
+     * El sessionId lo genera JS y llega en opts, para que JS pueda atender los
+     * eventos (p. ej. hostKey) mientras connect() aún no ha resuelto.
+     */
     @ReactMethod
     fun connect(opts: ReadableMap, promise: Promise) {
         pool.execute {
-            val id = UUID.randomUUID().toString()
+            val id = if (opts.hasKey("sessionId")) opts.getString("sessionId")!! else UUID.randomUUID().toString()
+            val host = opts.getString("host")!!
+            val port = opts.getInt("port")
+            val client = SSHClient()
+            connecting[id] = client
             try {
-                val client = SSHClient()
+                client.connectTimeout = CONNECT_TIMEOUT_MS
+                // El kex espera mientras el usuario lee la huella: margen amplio.
+                client.transport.timeoutMs = HOSTKEY_WAIT_MS + 10_000
                 val known = if (opts.hasKey("knownHostFingerprint")) opts.getString("knownHostFingerprint") else null
                 client.addHostKeyVerifier(object : HostKeyVerifier {
                     override fun verify(h: String, p: Int, key: PublicKey): Boolean {
@@ -134,16 +145,35 @@ class SshModule(private val rc: ReactApplicationContext) : ReactContextBaseJavaM
                             putString("fingerprint", fp)
                             putBoolean("changed", known != null)
                         })
-                        return try { fut.get(120, TimeUnit.SECONDS) } catch (e: Exception) { false }
+                        return try {
+                            fut.get(HOSTKEY_WAIT_MS.toLong(), TimeUnit.MILLISECONDS)
+                        } catch (e: Exception) {
+                            false
+                        } finally {
+                            pendingHostKeys.remove(id)
+                        }
                     }
                     override fun findExistingAlgorithms(h: String, p: Int) = emptyList<String>()
                 })
-                client.connect(opts.getString("host"), opts.getInt("port"))
+                try {
+                    client.connect(host, port)
+                } catch (e: java.net.SocketTimeoutException) {
+                    throw ConnectFailure("No responde $host:$port (timeout). ¿Está el móvil en la misma red o VPN que el servidor?", e)
+                } catch (e: java.net.UnknownHostException) {
+                    throw ConnectFailure("No se encuentra el host \"$host\" (DNS)", e)
+                } catch (e: java.net.ConnectException) {
+                    throw ConnectFailure("Conexión rechazada en $host:$port. ¿Puerto correcto y sshd activo?", e)
+                } catch (e: net.schmizz.sshj.transport.TransportException) {
+                    if (e.disconnectReason == net.schmizz.sshj.common.DisconnectReason.HOST_KEY_NOT_VERIFIABLE) {
+                        throw ConnectFailure("Huella del servidor no aceptada", e)
+                    }
+                    throw e
+                }
 
                 val user = opts.getString("username")!!
                 val auth = opts.getMap("auth")!!
-                when (auth.getString("type")) {
-                    "password" -> client.authPassword(user, auth.getString("password"))
+                try { when (auth.getString("type")) {
+                    "password" -> KeyTools.authPasswordOrInteractive(client, user, auth.getString("password") ?: "")
                     "privateKey" -> {
                         val keyId = auth.getString("keyId")!!
                         val pem = vault.get(KeyVault.privateKeyName(keyId))
@@ -152,21 +182,44 @@ class SshModule(private val rc: ReactApplicationContext) : ReactContextBaseJavaM
                         client.authPublickey(user, KeyTools.load(pem, pass))
                     }
                     else -> throw IllegalArgumentException("Método de auth desconocido")
+                } } catch (e: net.schmizz.sshj.userauth.UserAuthException) {
+                    val allowed = try { client.userAuth.allowedMethods.joinToString(", ") } catch (_: Exception) { "" }
+                    throw ConnectFailure(
+                        "Autenticación rechazada para $user (contraseña o clave incorrecta)" +
+                            if (allowed.isNotEmpty()) ". El servidor acepta: $allowed" else "",
+                        e,
+                    )
                 }
 
                 val session = client.startSession()
                 val term = if (opts.hasKey("term")) opts.getString("term")!! else "xterm-256color"
                 session.allocatePTY(term, opts.getInt("cols"), opts.getInt("rows"), 0, 0, emptyMap())
                 val shell = session.startShell()
+                if (connecting.remove(id) == null) {
+                    // disconnect() llegó mientras conectábamos: abortar.
+                    client.disconnect()
+                    return@execute promise.reject("CANCELLED", "Conexión cancelada")
+                }
                 sessions[id] = Sess(client, shell, session)
                 pump(id, shell)
                 promise.resolve(id)
-            } catch (e: VaultLockedException) {
-                promise.reject("LOCKED", "Vault bloqueado", e)
             } catch (e: Exception) {
-                promise.reject("CONNECT_ERROR", e.message, e)
+                connecting.remove(id)
+                try { client.disconnect() } catch (_: Exception) {}
+                when (e) {
+                    is VaultLockedException -> promise.reject("LOCKED", "Vault bloqueado", e)
+                    is ConnectFailure -> promise.reject("CONNECT_ERROR", e.message, e)
+                    else -> promise.reject("CONNECT_ERROR", e.message ?: e.javaClass.simpleName, e)
+                }
             }
         }
+    }
+
+    private class ConnectFailure(msg: String, cause: Throwable) : Exception(msg, cause)
+
+    private companion object {
+        const val CONNECT_TIMEOUT_MS = 15_000
+        const val HOSTKEY_WAIT_MS = 120_000
     }
 
     private fun pump(id: String, shell: Session.Shell) {
@@ -226,6 +279,9 @@ class SshModule(private val rc: ReactApplicationContext) : ReactContextBaseJavaM
     }
 
     private fun closeSession(id: String) {
+        // Conexión a medias: rechazar la huella pendiente y cortar el socket.
+        pendingHostKeys.remove(id)?.complete(false)
+        connecting.remove(id)?.let { try { it.disconnect() } catch (_: Exception) {} }
         sessions.remove(id)?.let {
             try { it.session.close() } catch (_: Exception) {}
             try { it.client.disconnect() } catch (_: Exception) {}
