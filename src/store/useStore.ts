@@ -1,5 +1,12 @@
 import { useCallback, useEffect, useState } from 'react';
+import {
+  HostUpdate,
+  hostsWaitingForKey,
+  isIncomplete,
+  planImport,
+} from '../import/merge';
 import type { ImportResult } from '../import/xshell';
+import { renameFolder } from './folders';
 import { Ssh } from '../native/SshModule';
 import { Host, SshKey } from './models';
 import { newId, readJson, withUnlock, writeJson } from './vault';
@@ -88,15 +95,19 @@ export function useStore() {
 
     /**
      * Importa hosts y claves de otro cliente (p. ej. Xshell). Las claves se
-     * asocian por nombre; los hosts repetidos se omiten. Devuelve un resumen.
+     * asocian por nombre. Si hay hosts existentes incompletos que la
+     * importación puede completar, se pregunta con `confirmUpdates`.
      */
-    importBatch: async (data: ImportResult) => {
+    importBatch: async (
+      data: ImportResult,
+      confirmUpdates: (u: HostUpdate[]) => Promise<boolean>,
+    ) => {
       const report: string[] = [];
       const newKeys: SshKey[] = [];
-      const byName = new Map(keys.map(k => [k.name.toLowerCase(), k.id]));
+      const known = new Set(keys.map(k => k.name.toLowerCase()));
 
       for (const k of data.keys) {
-        if (byName.has(k.name.toLowerCase())) {
+        if (known.has(k.name.toLowerCase())) {
           report.push(`Clave ${k.name}: ya existía`);
           continue;
         }
@@ -106,57 +117,61 @@ export function useStore() {
             Ssh.importKey(id, k.pem.trim() + '\n', null, k.name),
           );
           newKeys.push({ id, name: k.name, ...info, createdAt: Date.now() });
-          byName.set(k.name.toLowerCase(), id);
+          known.add(k.name.toLowerCase());
         } catch (e: any) {
           report.push(
             `Clave ${k.name}: ${e?.message ?? e} (si tiene passphrase, impórtala desde Claves)`,
           );
         }
       }
+      const allKeys = [...keys, ...newKeys];
       if (newKeys.length) {
-        await saveKeys([...keys, ...newKeys]);
+        await saveKeys(allKeys);
       }
 
-      const sig = (h: Pick<Host, 'name' | 'host' | 'port' | 'username'>) =>
-        `${h.name}|${h.username}@${h.host}:${h.port}`.toLowerCase();
-      const seen = new Set(hosts.map(sig));
-      const newHosts: Host[] = [];
-      let noCreds = 0;
-      for (const h of data.hosts) {
-        if (seen.has(sig(h))) {
-          continue;
-        }
-        seen.add(sig(h));
-        const keyId = h.keyName && byName.get(h.keyName.toLowerCase());
-        if (h.keyName && !keyId) {
-          report.push(`${h.name}: falta la clave "${h.keyName}"`);
-        }
-        if (!keyId || !h.username) {
-          noCreds++;
-        }
-        newHosts.push({
-          id: newId(),
-          name: h.name,
-          group: h.group,
-          host: h.host,
-          port: h.port,
-          username: h.username,
-          auth: keyId
-            ? { type: 'privateKey', keyId }
-            : { type: 'password', password: '' },
-        });
-      }
-      if (newHosts.length) {
-        await saveHosts([...hosts, ...newHosts]);
+      const plan = planImport(hosts, allKeys, data.hosts, newId);
+      const visible = plan.toUpdate.filter(u => u.changes.length);
+      const apply =
+        visible.length === 0 ? true : await confirmUpdates(visible);
+      const updates = new Map(
+        plan.toUpdate
+          .filter(u => apply || !u.changes.length)
+          .map(u => [u.id, u.patch]),
+      );
+      const next = [
+        ...hosts.map(h => (updates.has(h.id) ? { ...h, ...updates.get(h.id) } : h)),
+        ...plan.toAdd,
+      ];
+      if (plan.toAdd.length || updates.size) {
+        await saveHosts(next);
       }
       return {
-        hosts: newHosts.length,
-        duplicates: data.hosts.length - newHosts.length,
+        hosts: plan.toAdd.length,
+        updated: apply ? visible.length : 0,
+        duplicates: plan.duplicates,
         keys: newKeys.length,
-        incomplete: noCreds,
-        notes: [...report, ...data.skipped],
+        incomplete: next.filter(h => isIncomplete(h, allKeys)).length,
+        notes: [...report, ...plan.notes, ...data.skipped],
       };
     },
+
+    /** Hosts importados que esperaban esta clave (por nombre). */
+    hostsWaitingForKey: (key: SshKey) =>
+      hostsWaitingForKey(hosts, keys, key.name),
+
+    /** Asigna una clave a varios hosts de una vez. */
+    assignKey: (keyId: string, hostIds: string[]) =>
+      saveHosts(
+        hosts.map(h =>
+          hostIds.includes(h.id)
+            ? { ...h, auth: { type: 'privateKey', keyId } }
+            : h,
+        ),
+      ),
+
+    /** Mover/renombrar una carpeta con todo su contenido. */
+    renameFolder: (from: string, to: string) =>
+      saveHosts(renameFolder(hosts, from, to)),
 
     /** No se puede borrar una clave en uso por algún host. */
     deleteKey: async (id: string) => {

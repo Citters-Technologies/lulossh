@@ -15,6 +15,11 @@ export interface Host {
   /** Agrupación libre, p. ej. "Clientes" o "Casa". */
   group?: string;
   lastUsedAt?: number;
+  /**
+   * Nombre de la clave en el cliente de origen (p. ej. UserKey de Xshell).
+   * Sirve para enlazarla si se importa más tarde.
+   */
+  importedKeyName?: string;
 }
 
 export interface SshKey {

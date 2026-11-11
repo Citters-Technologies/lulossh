@@ -27,7 +27,7 @@ test('parseIni lee secciones y claves', () => {
 
 test('grupo a partir de las carpetas (tras Sessions/)', () => {
   expect(groupFromPath('Xshell/Sessions/Clientes/Web/prod.xsh')).toBe(
-    'Clientes / Web',
+    'Clientes/Web',
   );
   expect(groupFromPath('Casa/nas.xsh')).toBe('Casa');
   expect(groupFromPath('nas.xsh')).toBeUndefined();

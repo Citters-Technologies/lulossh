@@ -1,9 +1,22 @@
-import React, { useState } from 'react';
-import { Alert, Pressable, ScrollView, Text } from 'react-native';
+import React, { useMemo, useState } from 'react';
+import { Alert, Pressable, ScrollView, StyleSheet, Text } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { allFolderPaths, normPath, splitPath } from '../store/folders';
 import { Host, HostAuth, validateHost } from '../store/models';
 import { Store } from '../store/useStore';
-import { Button, Field, Header, Segmented, styles } from '../ui/kit';
+import { Button, colors, Field, Header, Segmented, styles } from '../ui/kit';
+
+const local = StyleSheet.create({
+  chips: { gap: 8, paddingVertical: 2 },
+  chip: {
+    borderRadius: 14,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    backgroundColor: colors.surface2,
+  },
+  chipActive: { backgroundColor: colors.accent },
+  chipText: { color: colors.text },
+});
 
 export function HostEditScreen({
   store,
@@ -34,6 +47,7 @@ export function HostEditScreen({
   );
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const folders = useMemo(() => allFolderPaths(store.hosts), [store.hosts]);
 
   const save = async () => {
     const draft: Omit<Host, 'id'> = {
@@ -42,7 +56,7 @@ export function HostEditScreen({
       host: address.trim(),
       port: Number(port),
       username: username.trim(),
-      group: group.trim() || undefined,
+      group: normPath(group),
       auth:
         authType === 'password'
           ? { type: 'password', password }
@@ -115,11 +129,34 @@ export function HostEditScreen({
         />
         <Field label="Usuario" value={username} onChangeText={setUsername} />
         <Field
-          label="Grupo (opcional)"
+          label="Carpeta (opcional, “/” para anidar)"
           value={group}
           onChangeText={setGroup}
-          placeholder="Clientes, Casa…"
+          placeholder="Clientes/Acme"
         />
+        {folders.length > 0 && (
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            keyboardShouldPersistTaps="handled"
+            contentContainerStyle={local.chips}
+          >
+            {['', ...folders].map(f => {
+              const active = (normPath(group) ?? '') === f;
+              return (
+                <Pressable
+                  key={f || '-'}
+                  onPress={() => setGroup(f)}
+                  style={[local.chip, active && local.chipActive]}
+                >
+                  <Text style={local.chipText}>
+                    {f ? splitPath(f).join(' › ') : 'Sin carpeta'}
+                  </Text>
+                </Pressable>
+              );
+            })}
+          </ScrollView>
+        )}
 
         <Text style={styles.section}>Autenticación</Text>
         <Segmented<HostAuth['type']>

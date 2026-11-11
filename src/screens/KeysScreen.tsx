@@ -37,7 +37,33 @@ export function KeysScreen({
     try {
       const key = await op();
       reset();
-      sharePublic(key);
+      const waiting = store.hostsWaitingForKey(key);
+      if (waiting.length) {
+        Alert.alert(
+          'Asignar clave',
+          `${waiting.length} hosts importados esperaban la clave “${key.name}”:\n` +
+            waiting
+              .slice(0, 8)
+              .map(h => `• ${h.name}`)
+              .join('\n') +
+            '\n\n¿Asignársela?',
+          [
+            { text: 'No', style: 'cancel' },
+            {
+              text: 'Asignar',
+              onPress: () =>
+                store
+                  .assignKey(
+                    key.id,
+                    waiting.map(h => h.id),
+                  )
+                  .catch(e => setError(e?.message ?? String(e))),
+            },
+          ],
+        );
+      } else {
+        sharePublic(key);
+      }
     } catch (e: any) {
       setError(e?.message ?? String(e));
     } finally {

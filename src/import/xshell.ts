@@ -72,7 +72,7 @@ export function groupFromPath(path: string): string | undefined {
     parts = parts.slice(s + 1);
   }
   const dirs = parts.slice(0, -1);
-  return dirs.length ? dirs.join(' / ') : undefined;
+  return dirs.length ? dirs.join('/') : undefined;
 }
 
 /** Sesión .xsh -> host, o un motivo para ignorarla. */
