@@ -133,30 +133,31 @@ export const DEFAULT_LAYOUT: KeyboardLayout = {
   layers: {
     main: {
       name: 'Principal',
+      // Dos filas alineadas por columnas, flechas en T invertida:
+      //   Esc  /   -   |  Home  ↑  End PgUp  IA
+      //   Tab Ctrl Alt ~   ←    ↓   →  PgDn Shift
       rows: [
         [
           k('esc', 'Esc', { kind: 'key', key: 'esc' }),
-          k('tab', 'Tab', { kind: 'key', key: 'tab' }),
-          k('ctrl', 'Ctrl', { kind: 'modifier', modifier: 'ctrl' }),
-          k('alt', 'Alt', { kind: 'modifier', modifier: 'alt' }),
-          k('shift', 'Shift', { kind: 'modifier', modifier: 'shift' }),
+          k('slash', '/', { kind: 'text', text: '/' }),
+          k('dash', '-', { kind: 'text', text: '-' }),
+          k('pipe', '|', { kind: 'text', text: '|' }),
+          k('home', 'Home', { kind: 'key', key: 'home' }),
           k('up', '↑', { kind: 'key', key: 'up' }, true),
-          k('down', '↓', { kind: 'key', key: 'down' }, true),
-          k('left', '←', { kind: 'key', key: 'left' }, true),
-          k('right', '→', { kind: 'key', key: 'right' }, true),
+          k('end', 'End', { kind: 'key', key: 'end' }),
+          k('pgup', 'PgUp', { kind: 'key', key: 'pageUp' }, true),
           k('ai', 'IA', { kind: 'layer', layer: 'ai' }),
         ],
         [
-          k('pipe', '|', { kind: 'text', text: '|' }),
+          k('tab', 'Tab', { kind: 'key', key: 'tab' }),
+          k('ctrl', 'Ctrl', { kind: 'modifier', modifier: 'ctrl' }),
+          k('alt', 'Alt', { kind: 'modifier', modifier: 'alt' }),
           k('tilde', '~', { kind: 'text', text: '~' }),
-          k('slash', '/', { kind: 'text', text: '/' }),
-          k('dash', '-', { kind: 'text', text: '-' }),
-          k('under', '_', { kind: 'text', text: '_' }),
-          k('bslash', '\\', { kind: 'text', text: '\\' }),
-          k('home', 'Home', { kind: 'key', key: 'home' }),
-          k('end', 'End', { kind: 'key', key: 'end' }),
-          k('pgup', 'PgUp', { kind: 'key', key: 'pageUp' }),
-          k('pgdn', 'PgDn', { kind: 'key', key: 'pageDown' }),
+          k('left', '←', { kind: 'key', key: 'left' }, true),
+          k('down', '↓', { kind: 'key', key: 'down' }, true),
+          k('right', '→', { kind: 'key', key: 'right' }, true),
+          k('pgdn', 'PgDn', { kind: 'key', key: 'pageDown' }, true),
+          k('shift', 'Shift', { kind: 'modifier', modifier: 'shift' }),
         ],
       ],
     },
@@ -165,7 +166,7 @@ export const DEFAULT_LAYOUT: KeyboardLayout = {
       name: 'IA',
       rows: [
         [
-          k('ai-back', '←', { kind: 'layer', layer: 'main' }),
+          k('ai-back', 'ABC', { kind: 'layer', layer: 'main' }),
           k('ai-esc', 'Esc', { kind: 'key', key: 'esc' }),
           k('ai-esc2', 'Esc Esc', { kind: 'macro', sequence: `${ESC}${ESC}` }),
           k('ai-stab', '⇧Tab', { kind: 'macro', sequence: `${ESC}[Z` }),

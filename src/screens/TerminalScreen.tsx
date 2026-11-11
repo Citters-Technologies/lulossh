@@ -1,12 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import {
-  Alert,
-  KeyboardAvoidingView,
-  Platform,
-  StyleSheet,
-  Text,
-  View,
-} from 'react-native';
+import { Alert, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { KeyBar } from '../keyboard/KeyBar';
 import {
@@ -19,8 +12,14 @@ import { Ssh, sshEvents, toBase64 } from '../native/SshModule';
 import { Host, hostLabel } from '../store/models';
 import { newId, withUnlock } from '../store/vault';
 import { TerminalHandle, TerminalView } from '../terminal/TerminalView';
+import { useKeyboardHeight } from '../ui/useKeyboardHeight';
 
 const NO_MODS: ModifierState = { ctrl: false, alt: false, shift: false };
+
+const FONT_PREF = 'terminalFontSize';
+const FONT_MIN = 8;
+const FONT_MAX = 32;
+const FONT_DEFAULT = 14;
 
 export function TerminalScreen({
   host,
@@ -42,6 +41,48 @@ export function TerminalScreen({
   const [mods, setMods] = useState<ModifierState>(NO_MODS);
   const modsRef = useRef(mods);
   modsRef.current = mods;
+  const keyboardHeight = useKeyboardHeight();
+
+  // Tamaño de letra: teclas de volumen, persistido entre sesiones.
+  const fontSize = useRef(FONT_DEFAULT);
+  const [fontHint, setFontHint] = useState<string | null>(null);
+  const hintTimer = useRef<ReturnType<typeof setTimeout> | undefined>(
+    undefined,
+  );
+
+  useEffect(() => {
+    Ssh.prefGet(FONT_PREF)
+      .then(v => {
+        const n = Number(v);
+        if (n >= FONT_MIN && n <= FONT_MAX) {
+          fontSize.current = n;
+          term.current?.setFontSize(n);
+        }
+      })
+      .catch(() => {});
+
+    Ssh.setVolumeKeysEnabled(true);
+    const sub = sshEvents.addListener('volumeKey', (p: any) => {
+      const next = Math.min(
+        FONT_MAX,
+        Math.max(FONT_MIN, fontSize.current + (p.direction === 'up' ? 1 : -1)),
+      );
+      if (next === fontSize.current) {
+        return;
+      }
+      fontSize.current = next;
+      term.current?.setFontSize(next);
+      Ssh.prefSet(FONT_PREF, String(next)).catch(() => {});
+      setFontHint(`Letra ${next}`);
+      clearTimeout(hintTimer.current);
+      hintTimer.current = setTimeout(() => setFontHint(null), 1200);
+    });
+    return () => {
+      Ssh.setVolumeKeysEnabled(false);
+      sub.remove();
+      clearTimeout(hintTimer.current);
+    };
+  }, []);
 
   const send = useCallback((data: string) => {
     if (connected.current) {
@@ -132,6 +173,10 @@ export function TerminalScreen({
       return; // el WebView puede recargarse; no reconectar en silencio
     }
     started.current = true;
+    // El WebView ya cargó: aplicar el tamaño guardado (puede cambiar cols/rows).
+    if (fontSize.current !== FONT_DEFAULT) {
+      term.current?.setFontSize(fontSize.current);
+    }
     try {
       await withUnlock(
         () =>
@@ -164,7 +209,11 @@ export function TerminalScreen({
   };
 
   return (
-    <SafeAreaView style={styles.root}>
+    <SafeAreaView
+      style={styles.root}
+      // Con el teclado abierto, el hueco inferior lo pone keyboardHeight.
+      edges={keyboardHeight > 0 ? ['top', 'left', 'right'] : undefined}
+    >
       <View style={styles.header}>
         <Text style={styles.title} numberOfLines={1}>
           {host.name} · {hostLabel(host)}
@@ -173,23 +222,25 @@ export function TerminalScreen({
           {status} · Cerrar
         </Text>
       </View>
-      <KeyboardAvoidingView
-        style={{ flex: 1 }}
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-      >
+      <View style={[styles.body, { paddingBottom: keyboardHeight }]}>
         <TerminalView
           ref={term}
           onReady={onReady}
           onResize={onResize}
           onInput={onInput}
         />
+        {fontHint && (
+          <View style={styles.hint} pointerEvents="none">
+            <Text style={styles.hintText}>{fontHint}</Text>
+          </View>
+        )}
         <KeyBar
           layout={DEFAULT_LAYOUT}
           mods={mods}
           onToggleModifier={toggleModifier}
           onSend={sendFromBar}
         />
-      </KeyboardAvoidingView>
+      </View>
     </SafeAreaView>
   );
 }
@@ -199,4 +250,15 @@ const styles = StyleSheet.create({
   header: { flexDirection: 'row', justifyContent: 'space-between', padding: 8 },
   title: { color: '#d7dde5', fontWeight: '600' },
   status: { color: '#8fa1b3' },
+  body: { flex: 1 },
+  hint: {
+    position: 'absolute',
+    top: 12,
+    alignSelf: 'center',
+    backgroundColor: 'rgba(0,0,0,0.75)',
+    paddingHorizontal: 14,
+    paddingVertical: 6,
+    borderRadius: 14,
+  },
+  hintText: { color: '#fff', fontWeight: '600' },
 });

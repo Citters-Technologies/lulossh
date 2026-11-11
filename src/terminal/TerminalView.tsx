@@ -1,4 +1,11 @@
-import React, { forwardRef, useImperativeHandle, useRef } from 'react';
+import React, {
+  forwardRef,
+  useEffect,
+  useImperativeHandle,
+  useRef,
+} from 'react';
+import { Platform } from 'react-native';
+import { Ssh, sshEvents } from '../native/SshModule';
 import WebViewBase, {
   WebViewMessageEvent,
   WebViewProps,
@@ -12,11 +19,14 @@ const WebView = WebViewBase as unknown as React.ComponentType<
   WebViewProps & React.RefAttributes<WebViewRef>
 >;
 
+const NATIVE_KEYBOARD = Platform.OS === 'android';
+
 export interface TerminalHandle {
   /** Escribe bytes (base64) que llegan del host. */
   write(base64: string): void;
   focus(): void;
   clear(): void;
+  setFontSize(px: number): void;
 }
 
 interface Props {
@@ -37,7 +47,25 @@ export const TerminalView = forwardRef<TerminalHandle, Props>(
       write: b64 => run(`window.lulo.write("${b64}")`),
       focus: () => run('window.lulo.focus()'),
       clear: () => run('window.lulo.clear()'),
+      setFontSize: px => run(`window.lulo.setFontSize(${Number(px) || 14})`),
     }));
+
+    // Android: el teclado lo recibe una vista nativa (sin mayúsculas ni
+    // autocorrección en ningún IME), no el textarea del WebView.
+    const inputRef = useRef(onInput);
+    inputRef.current = onInput;
+    useEffect(() => {
+      if (!NATIVE_KEYBOARD) {
+        return;
+      }
+      const sub = sshEvents.addListener('termInput', (p: any) =>
+        inputRef.current(p.data),
+      );
+      return () => {
+        sub.remove();
+        Ssh.hideKeyboard(true);
+      };
+    }, []);
 
     const onMessage = (e: WebViewMessageEvent) => {
       let msg: any;
@@ -46,7 +74,12 @@ export const TerminalView = forwardRef<TerminalHandle, Props>(
       } catch {
         return;
       }
-      if (msg.type === 'ready') {
+      if (msg.type === 'tap') {
+        Ssh.showKeyboard();
+      } else if (msg.type === 'ready') {
+        if (NATIVE_KEYBOARD) {
+          run('window.lulo.useNativeKeyboard()');
+        }
         onReady({ cols: msg.cols, rows: msg.rows });
       } else if (msg.type === 'resize') {
         onResize({ cols: msg.cols, rows: msg.rows });

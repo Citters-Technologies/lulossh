@@ -66,6 +66,21 @@ export interface SshModuleSpec {
     comment: string,
   ): Promise<KeyInfo>;
   deleteKey(keyId: string): Promise<void>;
+
+  /**
+   * Teclado del sistema para la terminal, vía una vista nativa que se anuncia
+   * como "contraseña visible sin sugerencias" (sin mayúsculas ni
+   * autocorrección en ningún teclado). Lo escrito llega como evento
+   * "termInput" {data}.
+   */
+  showKeyboard(): void;
+  hideKeyboard(detach: boolean): void;
+
+  /** Teclas de volumen -> evento "volumeKey" {direction: 'up'|'down'}. */
+  setVolumeKeysEnabled(enabled: boolean): void;
+  /** Preferencias de interfaz NO sensibles, sin cifrar. */
+  prefGet(name: string): Promise<string | null>;
+  prefSet(name: string, value: string): Promise<void>;
 }
 
 export interface KeyInfo {

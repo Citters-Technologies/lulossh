@@ -8,6 +8,10 @@
 
   var term = new Terminal({
     cursorBlink: true,
+    cursorStyle: 'block',
+    // En Android el teclado va a una vista nativa y xterm nunca tiene el foco:
+    // sin esto pinta el cursor "inactivo" (contorno casi invisible).
+    cursorInactiveStyle: 'block',
     fontFamily: 'monospace',
     fontSize: 14,
     scrollback: 5000,
@@ -17,6 +21,30 @@
   var fit = new FitAddon.FitAddon();
   term.loadAddon(fit);
   term.open(document.getElementById('term'));
+
+  // xterm recibe el teclado por un <textarea> oculto. Sin esto, el teclado de
+  // Android lo trata como texto normal: mayúscula inicial, autocorrección y
+  // sugerencias, que rompen los comandos.
+  var ta = term.textarea;
+  if (ta) {
+    ta.setAttribute('autocapitalize', 'none');
+    ta.setAttribute('autocorrect', 'off');
+    ta.setAttribute('autocomplete', 'off');
+    ta.setAttribute('spellcheck', 'false');
+  }
+
+  // Modo "teclado nativo": RN gestiona el teclado con su propia vista (sin
+  // mayúsculas en ningún IME). El textarea de xterm no debe abrir teclado.
+  var nativeKeyboard = false;
+
+  // Toque en la terminal: pedir teclado a RN (o enfocar xterm si no hay nativo).
+  document.getElementById('term').addEventListener('click', function () {
+    if (nativeKeyboard) {
+      post({ type: 'tap' });
+    } else {
+      term.focus();
+    }
+  });
 
   function doFit() {
     try {
@@ -40,10 +68,22 @@
     },
     setFontSize: function (n) {
       term.options.fontSize = n;
-      doFit();
+      // Esperar al re-render para medir bien las celdas nuevas.
+      requestAnimationFrame(doFit);
     },
     focus: function () {
-      term.focus();
+      if (nativeKeyboard) {
+        post({ type: 'tap' });
+      } else {
+        term.focus();
+      }
+    },
+    useNativeKeyboard: function () {
+      nativeKeyboard = true;
+      if (ta) {
+        ta.setAttribute('inputmode', 'none'); // no abrir el IME desde el WebView
+        ta.blur();
+      }
     },
     clear: function () {
       term.clear();

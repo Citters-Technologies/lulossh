@@ -43,6 +43,44 @@ class SshModule(private val rc: ReactApplicationContext) : ReactContextBaseJavaM
         rc.getJSModule(DeviceEventManagerModule.RCTDeviceEventEmitter::class.java).emit(event, map)
     }
 
+    private val uiPrefs by lazy { rc.getSharedPreferences("lulossh_ui", android.content.Context.MODE_PRIVATE) }
+
+    @ReactMethod
+    fun setVolumeKeysEnabled(enabled: Boolean) {
+        VolumeKeys.attach(rc)
+        VolumeKeys.enabled = enabled
+    }
+
+    /** Abre el teclado del sistema sobre la vista nativa de entrada (ver TerminalInput). */
+    @ReactMethod
+    fun showKeyboard() {
+        val activity = rc.currentActivity ?: return
+        activity.runOnUiThread {
+            TerminalInput.show(activity) { data ->
+                emit("termInput", Arguments.createMap().apply { putString("data", data) })
+            }
+        }
+    }
+
+    @ReactMethod
+    fun hideKeyboard(detach: Boolean) {
+        val activity = rc.currentActivity ?: return
+        activity.runOnUiThread {
+            TerminalInput.hide(activity)
+            if (detach) TerminalInput.detach()
+        }
+    }
+
+    /** Preferencias de interfaz NO sensibles (tamaño de letra…), sin cifrar. */
+    @ReactMethod
+    fun prefGet(name: String, promise: Promise) = promise.resolve(uiPrefs.getString(name, null))
+
+    @ReactMethod
+    fun prefSet(name: String, value: String, promise: Promise) {
+        uiPrefs.edit().putString(name, value).apply()
+        promise.resolve(null)
+    }
+
     @ReactMethod fun addListener(eventName: String) {}
     @ReactMethod fun removeListeners(count: Int) {}
 

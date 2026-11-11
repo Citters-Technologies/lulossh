@@ -19,4 +19,8 @@ class MainActivity : ReactActivity() {
    */
   override fun createReactActivityDelegate(): ReactActivityDelegate =
       DefaultReactActivityDelegate(this, mainComponentName, fabricEnabled)
+
+  /** Volumen = zoom de la terminal cuando está activo (ver VolumeKeys). */
+  override fun dispatchKeyEvent(event: android.view.KeyEvent): Boolean =
+      com.lulossh.ssh.VolumeKeys.handle(event) || super.dispatchKeyEvent(event)
 }
