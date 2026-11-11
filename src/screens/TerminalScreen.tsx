@@ -314,6 +314,9 @@ export function TerminalScreen({
       connected.current = true;
       setStatus('Conectado');
       Ssh.resize(sessionId.current, size.cols, size.rows).catch(() => {});
+      // Al volver a una sesión, directamente con el teclado listo.
+      setBarVisible(true);
+      term.current?.focus();
       probeAiTools();
     } catch (e: any) {
       setStatus('Desconectado');

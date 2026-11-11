@@ -13,6 +13,7 @@ import { IdentitiesScreen } from './src/screens/IdentitiesScreen';
 import { KeyBarEditorScreen } from './src/screens/KeyBarEditorScreen';
 import { SessionsScreen } from './src/screens/SessionsScreen';
 import { Tab, TabShell } from './src/ui/TabShell';
+import { Direction, Transition } from './src/ui/Transition';
 import { LockScreen } from './src/screens/LockScreen';
 import { SettingsScreen } from './src/screens/SettingsScreen';
 import { loadLockSettings, LockSettings, shouldRelock } from './src/ui/appLock';
@@ -33,6 +34,20 @@ const JUICE_PREF = 'juiceImport';
 const appStyles = StyleSheet.create({
   blank: { flex: 1, backgroundColor: colors.bg },
 });
+
+/** Profundidad de navegación, para animar "adelante" o "atrás". */
+function depthOf(r: Route): number {
+  switch (r.name) {
+    case 'hosts':
+      return 0;
+    case 'keybar':
+      return 2;
+    case 'keys':
+      return r.from ? depthOf(r.from) + 1 : 1;
+    default:
+      return 1;
+  }
+}
 
 type Route =
   | { name: 'hosts' }
@@ -261,6 +276,22 @@ export default function App() {
     open();
   };
 
+  // Transiciones: hacia delante si la pantalla nueva es más profunda.
+  const routeKey =
+    route.name === 'terminal'
+      ? `terminal:${route.sessionId}`
+      : route.name === 'editHost'
+      ? `edit:${route.host?.id ?? 'new'}`
+      : route.name;
+  const depth = depthOf(route);
+  const prevRoute = useRef({ key: routeKey, depth });
+  const directionRef = useRef<Direction>('forward');
+  if (prevRoute.current.key !== routeKey) {
+    directionRef.current = depth < prevRoute.current.depth ? 'back' : 'forward';
+    prevRoute.current = { key: routeKey, depth };
+  }
+  const direction = directionRef.current;
+
   let screen: React.ReactNode;
   switch (route.name) {
     case 'hosts': {
@@ -285,6 +316,7 @@ export default function App() {
               : undefined
           }
         >
+          <Transition routeKey={tab} direction="fade">
           {tab === 'hosts' && (
             <HostsScreen
               store={store}
@@ -309,6 +341,7 @@ export default function App() {
           {tab === 'keys' && (
             <KeysScreen store={store} onBack={() => setTab('hosts')} embedded />
           )}
+          </Transition>
         </TabShell>
       );
       break;
@@ -368,7 +401,9 @@ export default function App() {
       <StatusBar barStyle="light-content" />
       {/* Bloqueado: no se pinta nada de la app (las sesiones siguen en nativo). */}
       {locked === false ? (
-        screen
+        <Transition routeKey={routeKey} direction={direction}>
+          {screen}
+        </Transition>
       ) : locked === true ? (
         <LockScreen onUnlocked={() => setLocked(false)} />
       ) : (
