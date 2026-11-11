@@ -28,6 +28,17 @@ export interface ConnectOptions {
   term?: string;
   /** Huella conocida (SHA256:...) para verificar el host. */
   knownHostFingerprint?: string;
+  /** Para listar/restaurar la sesión y mostrarla en la notificación. */
+  hostId?: string;
+  title?: string;
+}
+
+/** Sesión abierta en nativo (sigue viva aunque la UI se haya cerrado). */
+export interface LiveSession {
+  sessionId: string;
+  hostId: string | null;
+  title: string;
+  startedAt: number;
 }
 
 export interface SshSessionEvents {
@@ -51,6 +62,16 @@ export interface SshModuleSpec {
    * ve en la terminal). Devuelve stdout.
    */
   exec(sessionId: string, command: string, timeoutMs: number): Promise<string>;
+
+  /**
+   * Sesiones en segundo plano: siguen abiertas (servicio en primer plano con
+   * notificación) hasta que se desconectan o el servidor las cierra.
+   */
+  listSessions(): Promise<LiveSession[]>;
+  /** Historial reciente de la sesión (base64), para repintar la terminal. */
+  attach(sessionId: string): Promise<string>;
+  /** Sesión que el usuario pidió abrir desde la notificación, una vez. */
+  consumePendingOpen(): Promise<string | null>;
 
   /**
    * Vault cifrado (Keystore/Keychain). Si el usuario no se ha autenticado
@@ -117,7 +138,20 @@ if (!native) {
   console.warn('LuloSsh native module no disponible en esta plataforma');
 }
 
-export const Ssh = native as SshModuleSpec;
+// Sin módulo nativo (tests, plataforma sin implementar), cada llamada
+// devuelve una promesa rechazada en lugar de romper el render.
+export const Ssh: SshModuleSpec =
+  native ??
+  (new Proxy(
+    {},
+    {
+      get: () => () => {
+        const p = Promise.reject(new Error('LuloSsh no disponible'));
+        p.catch(() => {});
+        return p;
+      },
+    },
+  ) as SshModuleSpec);
 type Listener = (payload: any) => void;
 interface EventSource {
   addListener(event: string, l: Listener): { remove(): void };

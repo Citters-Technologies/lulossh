@@ -23,7 +23,71 @@ import java.util.concurrent.TimeUnit
 /** Implementa el contrato de src/native/SshModule.ts. */
 class SshModule(private val rc: ReactApplicationContext) : ReactContextBaseJavaModule(rc) {
 
-    private class Sess(val client: SSHClient, val shell: Session.Shell, val session: Session)
+    private class Sess(
+        val client: SSHClient,
+        val shell: Session.Shell,
+        val session: Session,
+        val hostId: String?,
+        val title: String,
+        val startedAt: Long = System.currentTimeMillis(),
+    ) {
+        /** Últimos bytes de salida, para restaurar la pantalla al volver. */
+        val history = ByteRing(HISTORY_BYTES)
+    }
+
+    /** Buffer circular de bytes (thread-safe). */
+    private class ByteRing(private val cap: Int) {
+        private val buf = ByteArray(cap)
+        private var start = 0
+        private var size = 0
+
+        @Synchronized fun append(src: ByteArray, len: Int) {
+            for (i in 0 until len) {
+                buf[(start + size) % cap] = src[i]
+                if (size < cap) size++ else start = (start + 1) % cap
+            }
+        }
+
+        @Synchronized fun snapshot(): ByteArray =
+            ByteArray(size) { buf[(start + it) % cap] }
+    }
+
+    /** Actualiza el servicio en primer plano (notificación) con las sesiones abiertas. */
+    private fun syncService(lastId: String? = null) {
+        val list = sessions.entries.sortedBy { it.value.startedAt }
+        SshService.sync(rc, list.map { it.value.title }, lastId ?: list.lastOrNull()?.key)
+    }
+
+    @ReactMethod
+    fun listSessions(promise: Promise) {
+        val arr = Arguments.createArray()
+        sessions.entries.sortedBy { it.value.startedAt }.forEach { (id, s) ->
+            arr.pushMap(Arguments.createMap().apply {
+                putString("sessionId", id)
+                putString("hostId", s.hostId)
+                putString("title", s.title)
+                putDouble("startedAt", s.startedAt.toDouble())
+            })
+        }
+        promise.resolve(arr)
+    }
+
+    /** Historial reciente (base64) para repintar una sesión que siguió en segundo plano. */
+    @ReactMethod
+    fun attach(id: String, promise: Promise) {
+        val s = sessions[id] ?: return promise.reject("NO_SESSION", "La sesión ya no existe")
+        promise.resolve(Base64.encodeToString(s.history.snapshot(), Base64.NO_WRAP))
+    }
+
+    /** Sesión pedida desde la notificación (una sola vez), o null. */
+    @ReactMethod
+    fun consumePendingOpen(promise: Promise) {
+        val id = SshService.pendingOpen
+        SshService.pendingOpen = null
+        promise.resolve(id)
+        // Por si Android no dejó arrancar el servicio en segundo plano.
+        if (sessions.isNotEmpty()) syncService()
+    }
 
     private val sessions = ConcurrentHashMap<String, Sess>()
     private val pendingHostKeys = ConcurrentHashMap<String, CompletableFuture<Boolean>>()
@@ -198,7 +262,10 @@ class SshModule(private val rc: ReactApplicationContext) : ReactContextBaseJavaM
             val id = if (opts.hasKey("sessionId")) opts.getString("sessionId")!! else UUID.randomUUID().toString()
             val host = opts.getString("host")!!
             val port = opts.getInt("port")
-            val client = SSHClient()
+            // Keepalive SSH: detecta conexiones muertas (wifi caído, NAT que expira…).
+            val client = SSHClient(net.schmizz.sshj.DefaultConfig().apply {
+                keepAliveProvider = net.schmizz.keepalive.KeepAliveProvider.KEEP_ALIVE
+            })
             connecting[id] = client
             try {
                 client.connectTimeout = CONNECT_TIMEOUT_MS
@@ -262,6 +329,10 @@ class SshModule(private val rc: ReactApplicationContext) : ReactContextBaseJavaM
                     )
                 }
 
+                // 15 s x 4 sin respuesta => conexión muerta => evento "closed" con motivo.
+                client.connection.keepAlive.keepAliveInterval = 15
+                (client.connection.keepAlive as? net.schmizz.keepalive.KeepAliveRunner)?.maxAliveCount = 4
+
                 val session = client.startSession()
                 val term = if (opts.hasKey("term")) opts.getString("term")!! else "xterm-256color"
                 session.allocatePTY(term, opts.getInt("cols"), opts.getInt("rows"), 0, 0, emptyMap())
@@ -271,8 +342,12 @@ class SshModule(private val rc: ReactApplicationContext) : ReactContextBaseJavaM
                     client.disconnect()
                     return@execute promise.reject("CANCELLED", "Conexión cancelada")
                 }
-                sessions[id] = Sess(client, shell, session)
-                pump(id, shell)
+                val title = if (opts.hasKey("title")) opts.getString("title")!! else "$user@$host"
+                val hostId = if (opts.hasKey("hostId")) opts.getString("hostId") else null
+                val sess = Sess(client, shell, session, hostId, title)
+                sessions[id] = sess
+                pump(id, sess)
+                syncService(id)
                 promise.resolve(id)
             } catch (e: Exception) {
                 connecting.remove(id)
@@ -291,16 +366,18 @@ class SshModule(private val rc: ReactApplicationContext) : ReactContextBaseJavaM
     private companion object {
         const val CONNECT_TIMEOUT_MS = 15_000
         const val HOSTKEY_WAIT_MS = 120_000
+        const val HISTORY_BYTES = 256 * 1024
     }
 
-    private fun pump(id: String, shell: Session.Shell) {
+    private fun pump(id: String, sess: Sess) {
         pool.execute {
             val buf = ByteArray(8192)
             try {
-                val input = shell.inputStream
+                val input = sess.shell.inputStream
                 while (true) {
                     val n = input.read(buf)
                     if (n < 0) break
+                    sess.history.append(buf, n)
                     emit("data", Arguments.createMap().apply {
                         putString("sessionId", id)
                         putString("base64", Base64.encodeToString(buf, 0, n, Base64.NO_WRAP))
@@ -392,6 +469,7 @@ class SshModule(private val rc: ReactApplicationContext) : ReactContextBaseJavaM
         sessions.remove(id)?.let {
             try { it.session.close() } catch (_: Exception) {}
             try { it.client.disconnect() } catch (_: Exception) {}
+            syncService()
         }
     }
 }

@@ -11,7 +11,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { isIncomplete } from '../import/merge';
 import { parseImport } from '../import/xshell';
-import { Ssh } from '../native/SshModule';
+import { LiveSession, Ssh } from '../native/SshModule';
 import { buildTree, FolderNode, normPath, splitPath } from '../store/folders';
 import { Host, hostLabel } from '../store/models';
 import { Store } from '../store/useStore';
@@ -22,11 +22,18 @@ const INDENT = 14;
 
 export function HostsScreen({
   store,
+  live,
+  onResume,
+  onDisconnect,
   onConnect,
   onEdit,
   onKeys,
 }: {
   store: Store;
+  /** Sesiones abiertas en segundo plano. */
+  live: LiveSession[];
+  onResume(s: LiveSession): void;
+  onDisconnect(s: LiveSession): void;
   onConnect(h: Host): void;
   onEdit(h?: Host): void;
   onKeys(): void;
@@ -225,6 +232,47 @@ export function HostsScreen({
             Aún no hay hosts. Pulsa “+ Host” para añadir el primero.
           </Text>
         )}
+        {live.length > 0 && (
+          <View>
+            <Text style={styles.section}>Sesiones abiertas</Text>
+            {live.map(s => (
+              <View key={s.sessionId} style={[styles.row, local.liveRow]}>
+                <Pressable
+                  onPress={() => onResume(s)}
+                  style={({ pressed }) => [local.liveMain, pressed && local.dim]}
+                >
+                  <Text style={styles.rowTitle} numberOfLines={1}>
+                    <Text style={local.liveDot}>● </Text>
+                    {s.title}
+                  </Text>
+                  <Text style={styles.rowSub}>
+                    desde las {new Date(s.startedAt).toLocaleTimeString().slice(0, 5)}{' '}
+                    · toca para volver
+                  </Text>
+                </Pressable>
+                <Pressable
+                  onPress={() =>
+                    Alert.alert('Desconectar', `¿Cerrar ${s.title}?`, [
+                      { text: 'Cancelar', style: 'cancel' },
+                      {
+                        text: 'Desconectar',
+                        style: 'destructive',
+                        onPress: () => onDisconnect(s),
+                      },
+                    ])
+                  }
+                  hitSlop={8}
+                  accessibilityLabel={`Desconectar ${s.title}`}
+                >
+                  <Text style={local.liveClose}>✕</Text>
+                </Pressable>
+              </View>
+            ))}
+            {store.hosts.length > 0 && (
+              <Text style={styles.section}>Hosts</Text>
+            )}
+          </View>
+        )}
         {renderChildren(tree, 0)}
         {store.hosts.length > 0 && (
           <Text style={styles.empty}>
@@ -285,6 +333,10 @@ const local = StyleSheet.create({
   folderName: { flex: 1, color: colors.text, fontWeight: '600' },
   count: { color: colors.muted },
   dim: { opacity: 0.6 },
+  liveRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+  liveMain: { flex: 1 },
+  liveDot: { color: '#22c55e' },
+  liveClose: { color: colors.muted, fontSize: 18, paddingHorizontal: 4 },
   backdrop: {
     flex: 1,
     backgroundColor: 'rgba(0,0,0,0.6)',

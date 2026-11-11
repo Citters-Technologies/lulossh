@@ -20,6 +20,18 @@ class MainActivity : ReactActivity() {
   override fun createReactActivityDelegate(): ReactActivityDelegate =
       DefaultReactActivityDelegate(this, mainComponentName, fabricEnabled)
 
+  override fun onCreate(savedInstanceState: android.os.Bundle?) {
+    super.onCreate(savedInstanceState)
+    com.lulossh.ssh.SshService.handleIntent(intent)
+  }
+
+  /** Toque en la notificación de sesiones: JS abre esa sesión al volver. */
+  override fun onNewIntent(intent: android.content.Intent) {
+    super.onNewIntent(intent)
+    setIntent(intent)
+    com.lulossh.ssh.SshService.handleIntent(intent)
+  }
+
   /** Volumen = zoom de la terminal cuando está activo (ver VolumeKeys). */
   override fun dispatchKeyEvent(event: android.view.KeyEvent): Boolean =
       com.lulossh.ssh.VolumeKeys.handle(event) || super.dispatchKeyEvent(event)

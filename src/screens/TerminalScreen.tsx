@@ -1,5 +1,13 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { Alert, Pressable, StyleSheet, Text, View } from 'react-native';
+import {
+  Alert,
+  AppState,
+  Keyboard,
+  Pressable,
+  StyleSheet,
+  Text,
+  View,
+} from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { AiTool, detectCommand, parseDetect } from '../ai/tools';
 import { KeyBar } from '../keyboard/KeyBar';
@@ -24,18 +32,26 @@ const FONT_DEFAULT = 14;
 
 export function TerminalScreen({
   host,
+  sessionId: initialId,
+  resume: resumeSession = false,
   onClose,
   onHostKeyAccepted,
 }: {
   host: Host;
+  /**
+   * Id de sesión (lo genera JS, no el nativo, para poder atender eventos como
+   * hostKey mientras connect() todavía no ha terminado).
+   */
+  sessionId: string;
+  /** true: volver a una sesión que siguió abierta en segundo plano. */
+  resume?: boolean;
+  /** Salir de la pantalla (la sesión, si sigue viva, queda en segundo plano). */
   onClose(): void;
   /** Para guardar la huella y no volver a preguntar. */
   onHostKeyAccepted(fingerprint: string): void;
 }) {
   const term = useRef<TerminalHandle>(null);
-  // El id lo generamos aquí (no el nativo) para poder atender eventos como
-  // hostKey mientras connect() todavía no ha terminado.
-  const sessionId = useRef(newId());
+  const sessionId = useRef(initialId);
   const connected = useRef(false);
   const started = useRef(false);
   const [status, setStatus] = useState('Conectando…');
@@ -51,7 +67,8 @@ export function TerminalScreen({
   // Toque en la consola: con teclado abierto, ocultar teclado y botonera;
   // si no, mostrar ambos.
   const onTap = () => {
-    if (keyboardHeight > 0) {
+    // keyboardHeight puede quedar desfasado tras apagar la pantalla.
+    if (keyboardHeight > 0 && Keyboard.isVisible()) {
       Ssh.hideKeyboard(false);
       setBarVisible(false);
     } else {
@@ -176,16 +193,32 @@ export function TerminalScreen({
     }
     Alert.alert('Desconectar', `¿Cerrar la sesión con ${host.name}?`, [
       { text: 'Cancelar', style: 'cancel' },
-      { text: 'Desconectar', style: 'destructive', onPress: onClose },
+      {
+        text: 'Desconectar',
+        style: 'destructive',
+        onPress: () => {
+          connected.current = false;
+          Ssh.disconnect(sessionId.current).catch(() => {});
+          onClose();
+        },
+      },
     ]);
   };
+
+  // Mientras se repinta el historial de una sesión restaurada, los datos
+  // nuevos ya vienen incluidos en él.
+  const replaying = useRef(resumeSession);
+  const lastSize = useRef({ cols: 80, rows: 24 });
+  const [canReconnect, setCanReconnect] = useState(false);
 
   const handleEvent = useCallback((event: string, p: any) => {
     if (p.sessionId !== sessionId.current) {
       return;
     }
     if (event === 'data') {
-      term.current?.write(p.base64);
+      if (!replaying.current) {
+        term.current?.write(p.base64);
+      }
     } else if (event === 'closed') {
       const wasConnected = connected.current;
       connected.current = false;
@@ -195,6 +228,16 @@ export function TerminalScreen({
         return;
       }
       setStatus('Desconectado' + (p.reason ? `: ${p.reason}` : ''));
+      if (wasConnected) {
+        term.current?.write(
+          toBase64(
+            `\r\n\x1b[33m⚠ Conexión perdida${
+              p.reason ? `: ${p.reason}` : ''
+            }\x1b[0m\r\n`,
+          ),
+        );
+        setCanReconnect(true);
+      }
     } else if (event === 'hostKey') {
       Alert.alert(
         p.changed ? '⚠ La huella del host ha cambiado' : 'Host nuevo',
@@ -226,15 +269,64 @@ export function TerminalScreen({
     const subs = (['data', 'closed', 'hostKey', 'error'] as const).map(ev =>
       sshEvents.addListener(ev, (p: any) => handleEvent(ev, p)),
     );
-    const id = sessionId.current;
     return () => {
       subs.forEach(s => s.remove());
-      // También aborta una conexión a medias (p. ej. esperando la huella).
-      Ssh.disconnect(id).catch(() => {});
+      // Una sesión ya abierta sigue en segundo plano (notificación); solo se
+      // aborta una conexión a medias (p. ej. esperando la huella).
+      if (!connected.current) {
+        Ssh.disconnect(sessionId.current).catch(() => {});
+      }
     };
   }, [handleEvent]);
 
+  const probeAiTools = () =>
+    Ssh.exec(sessionId.current, detectCommand(), 8000)
+      .then(out => setAiTools(parseDetect(out)))
+      .catch(() => {});
+
+  const resume = async (size: { cols: number; rows: number }) => {
+    try {
+      const history = await Ssh.attach(sessionId.current);
+      if (history) {
+        term.current?.write(history);
+      }
+      connected.current = true;
+      setStatus('Conectado');
+      Ssh.resize(sessionId.current, size.cols, size.rows).catch(() => {});
+      probeAiTools();
+    } catch (e: any) {
+      setStatus('Desconectado');
+      term.current?.write(
+        toBase64(`\r\n\x1b[33m⚠ ${e?.message ?? e}\x1b[0m\r\n`),
+      );
+      setCanReconnect(true);
+    } finally {
+      replaying.current = false;
+    }
+  };
+
+  const reconnect = () => {
+    setCanReconnect(false);
+    setAiTools([]);
+    sessionId.current = newId();
+    replaying.current = false;
+    term.current?.write(toBase64('\r\n\x1b[2mReconectando…\x1b[0m\r\n'));
+    setStatus('Conectando…');
+    connect(lastSize.current);
+  };
+
+  // Al volver a primer plano, si el teclado estaba en uso, reengancharlo.
+  useEffect(() => {
+    const sub = AppState.addEventListener('change', s => {
+      if (s === 'active' && connected.current && barVisible) {
+        Ssh.hideKeyboard(true); // vista de entrada nueva: IME limpio
+      }
+    });
+    return () => sub.remove();
+  }, [barVisible]);
+
   const onReady = async (size: { cols: number; rows: number }) => {
+    lastSize.current = size;
     if (started.current) {
       return; // el WebView puede recargarse; no reconectar en silencio
     }
@@ -243,6 +335,14 @@ export function TerminalScreen({
     if (fontSize.current !== FONT_DEFAULT) {
       term.current?.setFontSize(fontSize.current);
     }
+    if (resumeSession) {
+      await resume(size);
+    } else {
+      await connect(size);
+    }
+  };
+
+  const connect = async (size: { cols: number; rows: number }) => {
     try {
       await withUnlock(
         () =>
@@ -253,6 +353,8 @@ export function TerminalScreen({
             username: host.username,
             auth: host.auth,
             knownHostFingerprint: host.fingerprint,
+            hostId: host.id,
+            title: `${host.name} · ${hostLabel(host)}`,
             ...size,
           }),
         `Conectar a ${host.name}`,
@@ -261,18 +363,18 @@ export function TerminalScreen({
       setStatus('Conectado');
       term.current?.focus();
       // ¿Hay CLIs de IA en el destino? (canal aparte, no se ve en la terminal)
-      Ssh.exec(sessionId.current, detectCommand(), 8000)
-        .then(out => setAiTools(parseDetect(out)))
-        .catch(() => {});
+      probeAiTools();
     } catch (e: any) {
       const msg = e?.message ?? String(e);
       setStatus('Error');
+      setCanReconnect(true);
       // Mostrarlo también en la terminal, que es donde mira el usuario.
       term.current?.write(toBase64(`\r\n\x1b[31m✖ ${msg}\x1b[0m\r\n`));
     }
   };
 
   const onResize = (size: { cols: number; rows: number }) => {
+    lastSize.current = size;
     if (connected.current) {
       Ssh.resize(sessionId.current, size.cols, size.rows).catch(() => {});
     }
@@ -285,6 +387,13 @@ export function TerminalScreen({
       edges={keyboardHeight > 0 ? ['top', 'left', 'right'] : undefined}
     >
       <View style={styles.header}>
+        <Pressable
+          onPress={onClose}
+          hitSlop={10}
+          accessibilityLabel="Volver a la lista (la sesión sigue abierta)"
+        >
+          <Text style={styles.back}>‹</Text>
+        </Pressable>
         <View style={styles.titleBox}>
           <Text style={styles.title} numberOfLines={1}>
             {host.name} · {hostLabel(host)}
@@ -293,6 +402,15 @@ export function TerminalScreen({
             {status}
           </Text>
         </View>
+        {canReconnect && (
+          <Pressable
+            onPress={reconnect}
+            hitSlop={8}
+            style={({ pressed }) => [styles.reBtn, pressed && styles.pressed]}
+          >
+            <Text style={styles.reText}>Reconectar</Text>
+          </Pressable>
+        )}
         <Pressable
           onPress={askDisconnect}
           hitSlop={8}
@@ -395,6 +513,15 @@ const styles = StyleSheet.create({
     paddingVertical: 6,
   },
   pressed: { opacity: 0.6 },
+  back: { color: '#d7dde5', fontSize: 28, lineHeight: 30, paddingRight: 4 },
+  reBtn: {
+    borderWidth: 1,
+    borderColor: '#3b82f6',
+    borderRadius: 6,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+  },
+  reText: { color: '#7fb0ff', fontWeight: '600' },
   closeText: { color: '#ff7b72', fontWeight: '600' },
   body: { flex: 1 },
   hint: {
