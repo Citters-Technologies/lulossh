@@ -29,6 +29,7 @@ import { Host, hostLabel } from '../store/models';
 import { osBadge } from '../remote/osInfo';
 import { byName, colorFor, favorites, frequent } from '../store/ranking';
 import { Store } from '../store/useStore';
+import { HostPicker } from '../ui/HostPicker';
 import { Button, colors, Field, styles } from '../ui/kit';
 
 const COLLAPSED_PREF = 'collapsedGroups';
@@ -100,6 +101,39 @@ export function HostsScreen({
         { text: 'Quitar', style: 'destructive', onPress: () => saveOrder({}) },
       ],
     );
+
+  // Borrado masivo: ids preseleccionados al abrir el selector (null = cerrado).
+  const [bulk, setBulk] = useState<string[] | null>(null);
+  const confirmBulkDelete = (ids: string[]) => {
+    if (!ids.length) {
+      return;
+    }
+    Alert.alert(
+      `Borrar ${ids.length} ${ids.length === 1 ? 'host' : 'hosts'}`,
+      'No se puede deshacer (salvo restaurando una copia de seguridad). Las claves e identidades no se borran.',
+      [
+        { text: 'Cancelar', style: 'cancel' },
+        {
+          text: 'Borrar',
+          style: 'destructive',
+          onPress: () =>
+            store
+              .deleteHosts(ids)
+              .then(() => setBulk(null))
+              .catch(e => Alert.alert('Error', e?.message ?? String(e))),
+        },
+      ],
+    );
+  };
+  const hostsInFolder = (path: string) => {
+    const src = splitPath(path).map(p => p.toLowerCase());
+    return store.hosts
+      .filter(h => {
+        const parts = splitPath(h.group).map(p => p.toLowerCase());
+        return src.every((p, i) => parts[i] === p);
+      })
+      .map(h => h.id);
+  };
 
   const [juiceInstalled, setJuiceInstalled] = useState(false);
   useEffect(() => {
@@ -373,6 +407,11 @@ export function HostsScreen({
             right={
               searching ? undefined : (
                 <View style={local.sortBar}>
+                  {sorting && (
+                    <Pressable onPress={() => setBulk([])} hitSlop={8}>
+                      <Text style={local.sortDelete}>🗑 Borrar…</Text>
+                    </Pressable>
+                  )}
                   {sorting && Object.keys(order).length > 0 && (
                     <Pressable onPress={resetOrder} hitSlop={8}>
                       <Text style={local.sortReset}>A→Z</Text>
@@ -386,7 +425,7 @@ export function HostsScreen({
                     <Text
                       style={[local.sortChipText, sorting && local.sortChipTextOn]}
                     >
-                      {sorting ? '✓ Hecho' : '⇅ Ordenar'}
+                      {sorting ? '✓ Hecho' : '✎ Editar'}
                     </Text>
                   </Pressable>
                 </View>
@@ -396,7 +435,8 @@ export function HostsScreen({
             {sorting && (
               <Text style={local.sortHint}>
                 ↑↓ cambia el orden dentro de cada carpeta · ✎ edita el host
-                (también su carpeta) o renombra/mueve la carpeta
+                (también su carpeta) o renombra/mueve/vacía la carpeta · 🗑
+                Borrar… para quitar varios a la vez
               </Text>
             )}
             {renderChildren(tree, 0)}
@@ -462,6 +502,15 @@ export function HostsScreen({
             />
             <Button title="Guardar" onPress={saveRename} />
             <Button
+              title="Borrar hosts de la carpeta…"
+              kind="danger"
+              onPress={() => {
+                const ids = renaming ? hostsInFolder(renaming.from) : [];
+                setRenaming(null);
+                setBulk(ids);
+              }}
+            />
+            <Button
               title="Cancelar"
               kind="secondary"
               onPress={() => setRenaming(null)}
@@ -469,6 +518,18 @@ export function HostsScreen({
           </View>
         </View>
       </Modal>
+
+      <HostPicker
+        visible={bulk !== null}
+        title="Borrar hosts"
+        hosts={store.hosts}
+        initial={bulk ?? []}
+        isIncomplete={store.isIncomplete}
+        confirmLabel="Borrar"
+        danger
+        onCancel={() => setBulk(null)}
+        onConfirm={confirmBulkDelete}
+      />
     </View>
   );
 }
@@ -752,6 +813,7 @@ const local = StyleSheet.create({
   grow: { flex: 1 },
   sortBar: { flexDirection: 'row', alignItems: 'center', gap: 12 },
   sortReset: { color: colors.muted, fontSize: 12, fontWeight: '700' },
+  sortDelete: { color: '#f87171', fontSize: 12, fontWeight: '700' },
   sortChip: {
     paddingHorizontal: 10,
     paddingVertical: 4,

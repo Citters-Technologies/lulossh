@@ -25,6 +25,7 @@ export function HostPicker({
   initial,
   isIncomplete,
   confirmLabel,
+  danger,
   onCancel,
   onConfirm,
 }: {
@@ -34,6 +35,8 @@ export function HostPicker({
   initial?: string[];
   isIncomplete(h: Host): boolean;
   confirmLabel: string;
+  /** Botón de confirmar en rojo (acciones destructivas). */
+  danger?: boolean;
   onCancel(): void;
   onConfirm(ids: string[]): void;
 }) {
@@ -152,6 +155,8 @@ export function HostPicker({
         <View style={local.bottom}>
           <Button
             title={`${confirmLabel} (${sel.size})`}
+            kind={danger ? 'danger' : 'primary'}
+            disabled={danger && sel.size === 0}
             onPress={() => onConfirm([...sel])}
           />
         </View>

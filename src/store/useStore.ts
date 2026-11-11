@@ -148,6 +148,11 @@ export function useStore(enabled = true) {
 
     deleteHost: (id: string) => saveHosts(hostsRef.current.filter(h => h.id !== id)),
 
+    deleteHosts: (ids: string[]) => {
+      const gone = new Set(ids);
+      return saveHosts(hostsRef.current.filter(h => !gone.has(h.id)));
+    },
+
     patchHost: (id: string, patch: Partial<Host>) =>
       saveHosts(
         hostsRef.current.map(h => (h.id === id ? { ...h, ...patch } : h)),
