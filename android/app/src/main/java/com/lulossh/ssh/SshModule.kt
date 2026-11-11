@@ -81,6 +81,16 @@ class SshModule(private val rc: ReactApplicationContext) : ReactContextBaseJavaM
         promise.resolve(null)
     }
 
+    private val fileImport by lazy { FileImport(rc) }
+
+    /** Selector de ficheros para importar; resuelve con [{path, text}] ([] si se cancela). */
+    @ReactMethod
+    fun pickImportFiles(promise: Promise) {
+        val activity = rc.currentActivity
+            ?: return promise.reject("NO_ACTIVITY", "No hay actividad en primer plano")
+        activity.runOnUiThread { fileImport.pick(promise) }
+    }
+
     @ReactMethod fun addListener(eventName: String) {}
     @ReactMethod fun removeListeners(count: Int) {}
 

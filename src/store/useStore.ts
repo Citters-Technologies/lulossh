@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
+import type { ImportResult } from '../import/xshell';
 import { Ssh } from '../native/SshModule';
 import { Host, SshKey } from './models';
 import { newId, readJson, withUnlock, writeJson } from './vault';
@@ -83,6 +84,78 @@ export function useStore() {
       const key: SshKey = { id, name, ...info, createdAt: Date.now() };
       await saveKeys([...keys, key]);
       return key;
+    },
+
+    /**
+     * Importa hosts y claves de otro cliente (p. ej. Xshell). Las claves se
+     * asocian por nombre; los hosts repetidos se omiten. Devuelve un resumen.
+     */
+    importBatch: async (data: ImportResult) => {
+      const report: string[] = [];
+      const newKeys: SshKey[] = [];
+      const byName = new Map(keys.map(k => [k.name.toLowerCase(), k.id]));
+
+      for (const k of data.keys) {
+        if (byName.has(k.name.toLowerCase())) {
+          report.push(`Clave ${k.name}: ya existía`);
+          continue;
+        }
+        const id = newId();
+        try {
+          const info = await withUnlock(() =>
+            Ssh.importKey(id, k.pem.trim() + '\n', null, k.name),
+          );
+          newKeys.push({ id, name: k.name, ...info, createdAt: Date.now() });
+          byName.set(k.name.toLowerCase(), id);
+        } catch (e: any) {
+          report.push(
+            `Clave ${k.name}: ${e?.message ?? e} (si tiene passphrase, impórtala desde Claves)`,
+          );
+        }
+      }
+      if (newKeys.length) {
+        await saveKeys([...keys, ...newKeys]);
+      }
+
+      const sig = (h: Pick<Host, 'name' | 'host' | 'port' | 'username'>) =>
+        `${h.name}|${h.username}@${h.host}:${h.port}`.toLowerCase();
+      const seen = new Set(hosts.map(sig));
+      const newHosts: Host[] = [];
+      let noCreds = 0;
+      for (const h of data.hosts) {
+        if (seen.has(sig(h))) {
+          continue;
+        }
+        seen.add(sig(h));
+        const keyId = h.keyName && byName.get(h.keyName.toLowerCase());
+        if (h.keyName && !keyId) {
+          report.push(`${h.name}: falta la clave "${h.keyName}"`);
+        }
+        if (!keyId || !h.username) {
+          noCreds++;
+        }
+        newHosts.push({
+          id: newId(),
+          name: h.name,
+          group: h.group,
+          host: h.host,
+          port: h.port,
+          username: h.username,
+          auth: keyId
+            ? { type: 'privateKey', keyId }
+            : { type: 'password', password: '' },
+        });
+      }
+      if (newHosts.length) {
+        await saveHosts([...hosts, ...newHosts]);
+      }
+      return {
+        hosts: newHosts.length,
+        duplicates: data.hosts.length - newHosts.length,
+        keys: newKeys.length,
+        incomplete: noCreds,
+        notes: [...report, ...data.skipped],
+      };
     },
 
     /** No se puede borrar una clave en uso por algún host. */

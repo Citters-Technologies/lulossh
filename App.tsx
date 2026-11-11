@@ -1,11 +1,11 @@
 import React, { useEffect, useState } from 'react';
-import { BackHandler, StatusBar } from 'react-native';
+import { Alert, BackHandler, StatusBar } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { HostEditScreen } from './src/screens/HostEditScreen';
 import { HostsScreen } from './src/screens/HostsScreen';
 import { KeysScreen } from './src/screens/KeysScreen';
 import { TerminalScreen } from './src/screens/TerminalScreen';
-import { Host } from './src/store/models';
+import { Host, validateHost } from './src/store/models';
 import { useStore } from './src/store/useStore';
 
 type Route =
@@ -40,6 +40,17 @@ export default function App() {
         <HostsScreen
           store={store}
           onConnect={h => {
+            // Hosts importados sin usuario o sin credenciales: completar antes.
+            const missing =
+              validateHost(h) ||
+              (h.auth.type === 'password' && !h.auth.password
+                ? 'Falta la contraseña o la clave'
+                : null);
+            if (missing) {
+              Alert.alert('Completa el host', missing);
+              setRoute({ name: 'editHost', host: h });
+              return;
+            }
             store.patchHost(h.id, { lastUsedAt: Date.now() }).catch(() => {});
             setRoute({ name: 'terminal', host: h });
           }}

@@ -1,6 +1,8 @@
 import React, { useMemo, useState } from 'react';
-import { Pressable, ScrollView, Text, View } from 'react-native';
+import { Alert, Pressable, ScrollView, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { parseImport } from '../import/xshell';
+import { Ssh } from '../native/SshModule';
 import { Host, hostLabel } from '../store/models';
 import { Store } from '../store/useStore';
 import { Button, Field, Header, styles } from '../ui/kit';
@@ -17,6 +19,41 @@ export function HostsScreen({
   onKeys(): void;
 }) {
   const [q, setQ] = useState('');
+  const [busy, setBusy] = useState(false);
+
+  const importXshell = async () => {
+    try {
+      const entries = await Ssh.pickImportFiles();
+      if (!entries.length) {
+        return; // cancelado
+      }
+      setBusy(true);
+      const parsed = parseImport(entries);
+      if (!parsed.hosts.length && !parsed.keys.length) {
+        Alert.alert(
+          'Nada que importar',
+          'Elige el .xts exportado desde Xshell (Archivo → Exportar), un .zip ' +
+            'de la carpeta Sessions, ficheros .xsh o claves privadas .pem.',
+        );
+        return;
+      }
+      const r = await store.importBatch(parsed);
+      const lines = [
+        `${r.hosts} hosts nuevos, ${r.keys} claves nuevas.`,
+        r.duplicates ? `${r.duplicates} hosts ya existían.` : '',
+        r.incomplete
+          ? `${r.incomplete} hosts sin usuario o credenciales: al tocarlos se abrirá el editor.`
+          : '',
+        ...r.notes.slice(0, 12),
+        r.notes.length > 12 ? `… y ${r.notes.length - 12} avisos más` : '',
+      ].filter(Boolean);
+      Alert.alert('Importación de Xshell', lines.join('\n'));
+    } catch (e: any) {
+      Alert.alert('Error al importar', e?.message ?? String(e));
+    } finally {
+      setBusy(false);
+    }
+  };
 
   // Agrupados por "group"; dentro, los usados más recientemente primero.
   const groups = useMemo(() => {
@@ -90,6 +127,14 @@ export function HostsScreen({
           <Text style={styles.empty}>
             Mantén pulsado un host para editarlo.
           </Text>
+        )}
+        {store.loaded && (
+          <Button
+            title={busy ? 'Importando…' : 'Importar de Xshell'}
+            kind="secondary"
+            disabled={busy}
+            onPress={importXshell}
+          />
         )}
       </ScrollView>
     </SafeAreaView>

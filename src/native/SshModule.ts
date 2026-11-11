@@ -81,6 +81,18 @@ export interface SshModuleSpec {
   /** Preferencias de interfaz NO sensibles, sin cifrar. */
   prefGet(name: string): Promise<string | null>;
   prefSet(name: string, value: string): Promise<void>;
+
+  /**
+   * Selector de ficheros (varios). Los zip (.xts/.zip) se expanden conservando
+   * las carpetas. Resuelve con [] si el usuario cancela.
+   */
+  pickImportFiles(): Promise<ImportEntry[]>;
+}
+
+export interface ImportEntry {
+  /** Ruta dentro del zip (con carpetas) o nombre del fichero. */
+  path: string;
+  text: string;
 }
 
 export interface KeyInfo {
