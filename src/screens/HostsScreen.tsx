@@ -13,7 +13,18 @@ import {
 import { confirmUpdates, importFromJuiceSsh, showSummary } from '../import/ui';
 import { parseImport } from '../import/xshell';
 import { LiveSession, Ssh } from '../native/SshModule';
-import { buildTree, FolderNode, normPath, splitPath } from '../store/folders';
+import {
+  buildTree,
+  FolderNode,
+  folderKey,
+  hostKey,
+  ManualOrder,
+  moveInFolder,
+  normPath,
+  ORDER_PREF,
+  renameInOrder,
+  splitPath,
+} from '../store/folders';
 import { Host, hostLabel } from '../store/models';
 import { osBadge } from '../remote/osInfo';
 import { byName, colorFor, favorites, frequent } from '../store/ranking';
@@ -64,6 +75,31 @@ export function HostsScreen({
     });
   // Al buscar se despliega todo, para no esconder resultados.
   const isCollapsed = (path: string) => !searching && collapsed.has(path);
+
+  // Orden manual de carpetas y hosts (modo "Ordenar").
+  const [order, setOrder] = useState<ManualOrder>({});
+  const [sortingOn, setSorting] = useState(false);
+  const sorting = sortingOn && !searching;
+  useEffect(() => {
+    Ssh.prefGet(ORDER_PREF)
+      .then(v => v && setOrder(JSON.parse(v)))
+      .catch(() => {});
+  }, []);
+  const saveOrder = (next: ManualOrder) => {
+    setOrder(next);
+    Ssh.prefSet(ORDER_PREF, JSON.stringify(next)).catch(() => {});
+  };
+  const move = (parent: FolderNode, key: string, dir: -1 | 1) =>
+    saveOrder(moveInFolder(order, parent, key, dir));
+  const resetOrder = () =>
+    Alert.alert(
+      'Orden alfabético',
+      '¿Quitar el orden manual de todas las carpetas y hosts?',
+      [
+        { text: 'Cancelar', style: 'cancel' },
+        { text: 'Quitar', style: 'destructive', onPress: () => saveOrder({}) },
+      ],
+    );
 
   const [juiceInstalled, setJuiceInstalled] = useState(false);
   useEffect(() => {
@@ -120,7 +156,10 @@ export function HostsScreen({
         (h.group ?? '').toLowerCase().includes(needle),
     );
   }, [store.hosts, q]);
-  const tree = useMemo(() => buildTree(filtered, byName), [filtered]);
+  const tree = useMemo(
+    () => buildTree(filtered, byName, order),
+    [filtered, order],
+  );
   const favs = useMemo(() => favorites(store.hosts), [store.hosts]);
   const freq = useMemo(() => frequent(store.hosts), [store.hosts]);
   const liveHosts = useMemo(
@@ -135,6 +174,7 @@ export function HostsScreen({
     const to = normPath(renaming.to) ?? '';
     try {
       await store.renameFolder(renaming.from, to);
+      saveOrder(renameInOrder(order, renaming.from, to));
       setRenaming(null);
     } catch (e: any) {
       Alert.alert('Error', e?.message ?? String(e));
@@ -144,27 +184,53 @@ export function HostsScreen({
   const toggleFavorite = (h: Host) =>
     store.patchHost(h.id, { favorite: !h.favorite }).catch(() => {});
 
-  const renderHost = (h: Host, depth = 0, keyPrefix = '') => (
-    <HostRow
-      key={keyPrefix + h.id}
-      host={store.resolve(h)}
-      depth={depth}
-      incomplete={store.isIncomplete(h)}
-      identity={store.identities.find(i => i.id === h.identityId)?.name}
-      live={liveHosts.has(h.id)}
-      onPress={() => onConnect(h)}
-      onLongPress={() => onEdit(h)}
-      onStar={() => toggleFavorite(h)}
-    />
-  );
+  const renderHost = (
+    h: Host,
+    depth = 0,
+    keyPrefix = '',
+    parent?: FolderNode,
+  ) => {
+    const i = parent ? parent.hosts.indexOf(h) : -1;
+    return (
+      <HostRow
+        key={keyPrefix + h.id}
+        host={store.resolve(h)}
+        depth={depth}
+        incomplete={store.isIncomplete(h)}
+        identity={store.identities.find(x => x.id === h.identityId)?.name}
+        live={liveHosts.has(h.id)}
+        onPress={() => (sorting ? onEdit(h) : onConnect(h))}
+        onLongPress={() => onEdit(h)}
+        onStar={() => toggleFavorite(h)}
+        sort={
+          sorting && parent
+            ? {
+                up: i > 0 ? () => move(parent, hostKey(h.id), -1) : undefined,
+                down:
+                  i < parent.hosts.length - 1
+                    ? () => move(parent, hostKey(h.id), 1)
+                    : undefined,
+                edit: () => onEdit(h),
+              }
+            : undefined
+        }
+      />
+    );
+  };
 
-  const renderFolder = (f: FolderNode, depth: number): React.ReactNode => {
+  const renderFolder = (
+    f: FolderNode,
+    depth: number,
+    parent: FolderNode,
+  ): React.ReactNode => {
     const closed = isCollapsed(f.path);
+    const i = parent.folders.indexOf(f);
+    const rename = () => setRenaming({ from: f.path, to: f.path });
     return (
       <View key={f.path}>
         <Pressable
           onPress={() => toggleFolder(f.path)}
-          onLongPress={() => setRenaming({ from: f.path, to: f.path })}
+          onLongPress={rename}
           hitSlop={4}
           style={({ pressed }) => [
             local.folder,
@@ -177,9 +243,21 @@ export function HostsScreen({
           <Text style={local.folderName} numberOfLines={1}>
             {f.name}
           </Text>
-          <View style={local.badge}>
-            <Text style={local.badgeText}>{f.count}</Text>
-          </View>
+          {sorting ? (
+            <SortButtons
+              up={i > 0 ? () => move(parent, folderKey(f.name), -1) : undefined}
+              down={
+                i < parent.folders.length - 1
+                  ? () => move(parent, folderKey(f.name), 1)
+                  : undefined
+              }
+              edit={rename}
+            />
+          ) : (
+            <View style={local.badge}>
+              <Text style={local.badgeText}>{f.count}</Text>
+            </View>
+          )}
         </Pressable>
         {!closed && renderChildren(f, depth + 1)}
       </View>
@@ -188,8 +266,8 @@ export function HostsScreen({
 
   const renderChildren = (n: FolderNode, depth: number) => (
     <>
-      {n.folders.map(f => renderFolder(f, depth))}
-      {n.hosts.map(h => renderHost(h, depth))}
+      {n.folders.map(f => renderFolder(f, depth, n))}
+      {n.hosts.map(h => renderHost(h, depth, '', n))}
     </>
   );
 
@@ -292,7 +370,35 @@ export function HostsScreen({
             title={searching ? `Resultados (${filtered.length})` : 'Todos'}
             icon="≡"
             iconColor={colors.muted}
+            right={
+              searching ? undefined : (
+                <View style={local.sortBar}>
+                  {sorting && Object.keys(order).length > 0 && (
+                    <Pressable onPress={resetOrder} hitSlop={8}>
+                      <Text style={local.sortReset}>A→Z</Text>
+                    </Pressable>
+                  )}
+                  <Pressable
+                    onPress={() => setSorting(v => !v)}
+                    hitSlop={8}
+                    style={[local.sortChip, sorting && local.sortChipOn]}
+                  >
+                    <Text
+                      style={[local.sortChipText, sorting && local.sortChipTextOn]}
+                    >
+                      {sorting ? '✓ Hecho' : '⇅ Ordenar'}
+                    </Text>
+                  </Pressable>
+                </View>
+              )
+            }
           >
+            {sorting && (
+              <Text style={local.sortHint}>
+                ↑↓ cambia el orden dentro de cada carpeta · ✎ edita el host
+                (también su carpeta) o renombra/mueve la carpeta
+              </Text>
+            )}
             {renderChildren(tree, 0)}
             {searching && filtered.length === 0 && (
               <Text style={local.hint}>Sin resultados para “{q.trim()}”.</Text>
@@ -371,18 +477,21 @@ function Section({
   title,
   icon,
   iconColor,
+  right,
   children,
 }: {
   title: string;
   icon: string;
   iconColor: string;
+  right?: React.ReactNode;
   children: React.ReactNode;
 }) {
   return (
     <View style={local.section}>
       <View style={local.sectionHead}>
         <Text style={[local.sectionIcon, { color: iconColor }]}>{icon}</Text>
-        <Text style={local.sectionTitle}>{title}</Text>
+        <Text style={[local.sectionTitle, local.grow]}>{title}</Text>
+        {right}
       </View>
       {children}
     </View>
@@ -398,6 +507,7 @@ function HostRow({
   onPress,
   onLongPress,
   onStar,
+  sort,
 }: {
   host: Host;
   depth: number;
@@ -408,6 +518,8 @@ function HostRow({
   onPress(): void;
   onLongPress(): void;
   onStar(): void;
+  /** Modo ordenar: flechas y lápiz en lugar de la estrella. */
+  sort?: SortProps;
 }) {
   const label = h.name || h.host;
   const os = osBadge(h.os);
@@ -451,16 +563,54 @@ function HostRow({
           {hostLabel(h)}
         </Text>
       </View>
-      <Pressable
-        onPress={onStar}
-        hitSlop={12}
-        accessibilityLabel={h.favorite ? 'Quitar de favoritos' : 'Añadir a favoritos'}
-      >
-        <Text style={[local.star, h.favorite && local.starOn]}>
-          {h.favorite ? '★' : '☆'}
-        </Text>
-      </Pressable>
+      {sort ? (
+        <SortButtons {...sort} />
+      ) : (
+        <Pressable
+          onPress={onStar}
+          hitSlop={12}
+          accessibilityLabel={
+            h.favorite ? 'Quitar de favoritos' : 'Añadir a favoritos'
+          }
+        >
+          <Text style={[local.star, h.favorite && local.starOn]}>
+            {h.favorite ? '★' : '☆'}
+          </Text>
+        </Pressable>
+      )}
     </Pressable>
+  );
+}
+
+interface SortProps {
+  /** undefined = ya está en el extremo. */
+  up?: () => void;
+  down?: () => void;
+  edit(): void;
+}
+
+function SortButtons({ up, down, edit }: SortProps) {
+  const btn = (label: string, hint: string, fn?: () => void) => (
+    <Pressable
+      onPress={fn}
+      disabled={!fn}
+      hitSlop={4}
+      accessibilityLabel={hint}
+      style={({ pressed }) => [
+        local.sortBtn,
+        pressed && local.dim,
+        !fn && local.sortBtnOff,
+      ]}
+    >
+      <Text style={local.sortBtnText}>{label}</Text>
+    </Pressable>
+  );
+  return (
+    <View style={local.sortBtns}>
+      {btn('↑', 'Subir', up)}
+      {btn('↓', 'Bajar', down)}
+      {btn('✎', 'Editar', edit)}
+    </View>
   );
 }
 
@@ -599,6 +749,30 @@ const local = StyleSheet.create({
   },
   importText: { color: colors.muted, fontWeight: '600' },
   dim: { opacity: 0.6 },
+  grow: { flex: 1 },
+  sortBar: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+  sortReset: { color: colors.muted, fontSize: 12, fontWeight: '700' },
+  sortChip: {
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 12,
+    backgroundColor: colors.surface,
+  },
+  sortChipOn: { backgroundColor: colors.accent },
+  sortChipText: { color: colors.muted, fontSize: 12, fontWeight: '700' },
+  sortChipTextOn: { color: '#fff' },
+  sortHint: { color: '#5b6b7c', fontSize: 12, marginBottom: 8 },
+  sortBtns: { flexDirection: 'row', gap: 4 },
+  sortBtn: {
+    width: 34,
+    height: 34,
+    borderRadius: 8,
+    backgroundColor: colors.surface2,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  sortBtnOff: { opacity: 0.25 },
+  sortBtnText: { color: colors.text, fontSize: 16, fontWeight: '700' },
   backdrop: {
     flex: 1,
     backgroundColor: 'rgba(0,0,0,0.6)',

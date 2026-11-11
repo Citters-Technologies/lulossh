@@ -11,6 +11,7 @@ import type { Host, Identity, SshKey } from './models';
 export const BACKUP_PREFS = [
   LAYOUT_PREF,
   'collapsedGroups',
+  'hostOrder',
   'terminalFontSize',
   'appLock',
   'appLockAfter',
