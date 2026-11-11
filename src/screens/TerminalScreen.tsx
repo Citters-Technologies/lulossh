@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { Alert, StyleSheet, Text, View } from 'react-native';
+import { Alert, Pressable, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { KeyBar } from '../keyboard/KeyBar';
 import {
@@ -119,6 +119,19 @@ export function TerminalScreen({
 
   const acceptedRef = useRef(onHostKeyAccepted);
   acceptedRef.current = onHostKeyAccepted;
+  const closeRef = useRef(onClose);
+  closeRef.current = onClose;
+
+  const askDisconnect = () => {
+    if (!connected.current) {
+      onClose();
+      return;
+    }
+    Alert.alert('Desconectar', `¿Cerrar la sesión con ${host.name}?`, [
+      { text: 'Cancelar', style: 'cancel' },
+      { text: 'Desconectar', style: 'destructive', onPress: onClose },
+    ]);
+  };
 
   const handleEvent = useCallback((event: string, p: any) => {
     if (p.sessionId !== sessionId.current) {
@@ -127,7 +140,13 @@ export function TerminalScreen({
     if (event === 'data') {
       term.current?.write(p.base64);
     } else if (event === 'closed') {
+      const wasConnected = connected.current;
       connected.current = false;
+      if (wasConnected && !p.reason) {
+        // Cierre limpio (exit / logout): volver a la lista de conexiones.
+        closeRef.current();
+        return;
+      }
       setStatus('Desconectado' + (p.reason ? `: ${p.reason}` : ''));
     } else if (event === 'hostKey') {
       Alert.alert(
@@ -215,12 +234,23 @@ export function TerminalScreen({
       edges={keyboardHeight > 0 ? ['top', 'left', 'right'] : undefined}
     >
       <View style={styles.header}>
-        <Text style={styles.title} numberOfLines={1}>
-          {host.name} · {hostLabel(host)}
-        </Text>
-        <Text style={styles.status} onPress={onClose}>
-          {status} · Cerrar
-        </Text>
+        <View style={styles.titleBox}>
+          <Text style={styles.title} numberOfLines={1}>
+            {host.name} · {hostLabel(host)}
+          </Text>
+          <Text style={styles.status} numberOfLines={1}>
+            {status}
+          </Text>
+        </View>
+        <Pressable
+          onPress={askDisconnect}
+          hitSlop={8}
+          style={({ pressed }) => [styles.closeBtn, pressed && styles.pressed]}
+        >
+          <Text style={styles.closeText}>
+            {connected.current ? 'Desconectar' : 'Cerrar'}
+          </Text>
+        </Pressable>
       </View>
       <View style={[styles.body, { paddingBottom: keyboardHeight }]}>
         <TerminalView
@@ -247,9 +277,25 @@ export function TerminalScreen({
 
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: '#0b0f14' },
-  header: { flexDirection: 'row', justifyContent: 'space-between', padding: 8 },
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    gap: 10,
+  },
+  titleBox: { flex: 1 },
   title: { color: '#d7dde5', fontWeight: '600' },
-  status: { color: '#8fa1b3' },
+  status: { color: '#8fa1b3', fontSize: 12 },
+  closeBtn: {
+    borderWidth: 1,
+    borderColor: '#c0504d',
+    borderRadius: 6,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+  },
+  pressed: { opacity: 0.6 },
+  closeText: { color: '#ff7b72', fontWeight: '600' },
   body: { flex: 1 },
   hint: {
     position: 'absolute',
