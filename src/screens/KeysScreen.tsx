@@ -14,7 +14,7 @@ import { Ssh } from '../native/SshModule';
 import { SshKey } from '../store/models';
 import { Store } from '../store/useStore';
 import { expectExternalActivity } from '../ui/appLock';
-import { Button, colors, Field, Header, styles } from '../ui/kit';
+import { colors, Field, Header, styles } from '../ui/kit';
 
 type Mode = 'list' | 'generate' | 'import';
 
