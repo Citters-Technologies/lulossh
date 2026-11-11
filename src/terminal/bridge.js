@@ -7,13 +7,11 @@
   };
 
   var term = new Terminal({
-    // Sin parpadeo: con teclado nativo xterm no tiene foco y un cursor que
-    // parpadea se queda "apagado" (invisible). Lo queremos siempre sólido.
     cursorBlink: false,
     cursorStyle: 'block',
-    // En Android el teclado va a una vista nativa y xterm nunca tiene el foco:
-    // sin esto pinta el cursor "inactivo" (contorno casi invisible).
-    cursorInactiveStyle: 'block',
+    // Con teclado nativo xterm nunca tiene foco y su cursor "inactivo" queda
+    // invisible. Lo desactivamos ('none') y dibujamos uno propio (ver abajo).
+    cursorInactiveStyle: 'none',
     fontFamily: 'monospace',
     fontSize: 14,
     scrollback: 5000,
@@ -29,6 +27,46 @@
   var fit = new FitAddon.FitAddon();
   term.loadAddon(fit);
   term.open(document.getElementById('term'));
+
+  // ---- Cursor propio -----------------------------------------------------
+  // xterm, sin foco (teclado nativo), no pinta un cursor visible por más que
+  // se fuerce. Dibujamos un recuadro verde que seguimos con la API pública
+  // del buffer: siempre visible y fácil de localizar al moverse por el prompt.
+  var curEl = document.createElement('div');
+  curEl.id = 'lulo-cur';
+  var screenEl = term.element.querySelector('.xterm-screen');
+  (screenEl || term.element).appendChild(curEl);
+
+  function drawCursor() {
+    try {
+      var buf = term.buffer.active;
+      // Fila en pantalla = fila absoluta del cursor - desplazamiento visible.
+      var screenRow = buf.baseY + buf.cursorY - buf.viewportY;
+      var hidden = false;
+      try {
+        hidden = term._core._coreService.isCursorHidden;
+      } catch (e) {}
+      if (hidden || screenRow < 0 || screenRow >= term.rows) {
+        curEl.style.display = 'none';
+        return;
+      }
+      var sc = term.element.querySelector('.xterm-screen');
+      if (!sc) {
+        return;
+      }
+      var r = sc.getBoundingClientRect();
+      var cw = r.width / term.cols;
+      var ch = r.height / term.rows;
+      curEl.style.display = 'block';
+      curEl.style.width = cw + 'px';
+      curEl.style.height = ch + 'px';
+      curEl.style.transform =
+        'translate(' + buf.cursorX * cw + 'px,' + screenRow * ch + 'px)';
+    } catch (e) {}
+  }
+  term.onRender(drawCursor);
+  term.onCursorMove(drawCursor);
+  term.onResize(drawCursor);
 
   // xterm recibe el teclado por un <textarea> oculto. Sin esto, el teclado de
   // Android lo trata como texto normal: mayúscula inicial, autocorrección y
@@ -165,6 +203,7 @@
     try {
       fit.fit();
       post({ type: 'resize', cols: term.cols, rows: term.rows });
+      drawCursor();
     } catch (e) {}
   }
 

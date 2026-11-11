@@ -29,19 +29,15 @@ const html = `<!doctype html>
 <style>${css}
 html,body{margin:0;padding:0;height:100%;background:#0b0f14;overflow:hidden}
 #term{position:absolute;inset:0;padding:4px}
-/* Con teclado nativo xterm nunca tiene foco, así que pinta el cursor "inactivo"
-   (un recuadro de 1px casi invisible) y, si parpadea, lo deja apagado. Pintamos
-   la clase base .xterm-cursor (siempre presente) como un bloque sólido verde de
-   marca, sea cual sea su estilo, visible y sin parpadeo, para poder seguirlo al
-   moverse por el prompt. */
+/* Cursor propio: xterm sin foco (teclado nativo) no muestra cursor, así que lo
+   dibujamos nosotros. Recuadro verde de marca sobre la celda del cursor; no
+   tapa el carácter (solo borde) y se posiciona con transform desde bridge.js. */
 :root{--lulo-cursor:#9be22d;--lulo-cursor-accent:#0b0f14}
-.xterm .xterm-cursor,
-.xterm .xterm-cursor.xterm-cursor-outline,
-.xterm .xterm-cursor.xterm-cursor-bar,
-.xterm .xterm-cursor.xterm-cursor-underline{
-  background-color:var(--lulo-cursor) !important;color:var(--lulo-cursor-accent) !important;
-  outline:none !important;box-shadow:none !important;
-  opacity:1 !important;visibility:visible !important;
+.xterm .xterm-screen{position:relative}
+#lulo-cur{
+  position:absolute;top:0;left:0;z-index:5;pointer-events:none;
+  box-sizing:border-box;border:2px solid var(--lulo-cursor);border-radius:1px;
+  background:transparent;will-change:transform;
 }
 </style></head>
 <body><div id="term"></div>
