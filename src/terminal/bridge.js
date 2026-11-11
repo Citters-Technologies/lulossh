@@ -16,7 +16,13 @@
     fontSize: 14,
     scrollback: 5000,
     allowProposedApi: true,
-    theme: { background: '#0b0f14', foreground: '#d7dde5' },
+    theme: {
+      background: '#0b0f14',
+      foreground: '#d7dde5',
+      // Cursor en verde de marca, bien visible aunque xterm esté sin foco.
+      cursor: '#9be22d',
+      cursorAccent: '#0b0f14',
+    },
   });
   var fit = new FitAddon.FitAddon();
   term.loadAddon(fit);
