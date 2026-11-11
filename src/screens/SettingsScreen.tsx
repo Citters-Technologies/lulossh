@@ -64,12 +64,17 @@ export function SettingsScreen({
     setBusy(true);
     try {
       expectExternalActivity();
-      const name = await store.exportBackup(pw.a);
+      const saved = await store.exportBackup(pw.a);
       setPw(null);
-      if (name) {
+      if (saved) {
+        const kb = (n: number) => `${Math.max(1, Math.round(n / 1024))} KB`;
+        const suspicious = saved.providerBytes === 0;
         Alert.alert(
-          'Copia exportada',
-          `Guardada como “${name}”. Guárdala fuera del móvil (Drive, PC…) junto con su contraseña.`,
+          suspicious ? 'Revisa la copia' : 'Copia exportada',
+          `“${saved.name}”: ${kb(saved.bytes)} escritos.` +
+            (suspicious
+              ? '\n\nEl destino dice que el fichero ocupa 0 bytes. Si es una carpeta en la nube puede tardar en subir; si sigue vacío, exporta a Descargas y cópialo luego al PC o a Drive.'
+              : '\n\nGuárdala fuera del móvil (Drive, PC…) junto con su contraseña.'),
         );
       }
     } catch (e: any) {

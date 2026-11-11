@@ -129,13 +129,22 @@ export interface SshModuleSpec {
     keyIds: string[],
     password: string,
     fileName: string,
-  ): Promise<string | null>;
+  ): Promise<SavedFile | null>;
   /** Descifra una copia (falla con code 'BAD_PASSWORD'). Devuelve JSON. */
   decryptBackup(content: string, password: string): Promise<string>;
 
   /** Portapapeles del sistema. */
   copyText(text: string): void;
   pasteText(): Promise<string | null>;
+}
+
+export interface SavedFile {
+  name: string;
+  /** Bytes escritos por la app. */
+  bytes: number;
+  /** Tamaño que informa el destino (si lo informa). */
+  providerBytes?: number;
+  provider?: string;
 }
 
 /** Filas tal cual las devuelve el ContentProvider de JuiceSSH (todo string). */

@@ -37,6 +37,8 @@ const JUICE_PREF = 'juiceImport';
 
 const appStyles = StyleSheet.create({
   blank: { flex: 1, backgroundColor: colors.bg },
+  fill: { flex: 1 },
+  hidden: { display: 'none' },
 });
 
 
@@ -62,6 +64,9 @@ export default function App() {
   // 'hosts' es la vista de pestañas; `tab` dice cuál se ve.
   const [route, setRoute] = useState<Route>({ name: 'hosts' });
   const [tab, setTab] = useState<Tab>('hosts');
+  const [visitedTabs, setVisitedTabs] = useState<Set<Tab>>(
+    () => new Set<Tab>(['hosts']),
+  );
   const [live, setLive] = useState<LiveSession[]>([]);
   const home = () => setRoute({ name: 'hosts' });
   const setLocked = (v: boolean) => {
@@ -268,18 +273,25 @@ export default function App() {
     open();
   };
 
-  let screen: React.ReactNode;
-  switch (route.name) {
-    case 'hosts': {
-      const disconnect = (s: LiveSession) =>
-        Ssh.disconnect(s.sessionId)
-          .catch(() => {})
-          .then(refreshLive);
-      screen = (
+  // Vista de pestañas: se monta una vez y se queda montada (oculta) al ir a
+  // otras pantallas o pestañas. Reconstruir la lista de cientos de hosts en
+  // cada cambio era lo que hacía lenta la pestaña Hosts.
+  const disconnect = (s: LiveSession) =>
+    Ssh.disconnect(s.sessionId)
+      .catch(() => {})
+      .then(refreshLive);
+  const pane = (t: Tab, el: React.ReactNode) =>
+    visitedTabs.has(t) ? (
+      <View key={t} style={t === tab ? appStyles.fill : appStyles.hidden}>
+        {el}
+      </View>
+    ) : null;
+  const tabsView = (
         <TabShell
           tab={tab}
           onTab={t => {
             setTab(t);
+            setVisitedTabs(v => (v.has(t) ? v : new Set(v).add(t)));
             if (t === 'sessions') {
               refreshLive();
             }
@@ -292,7 +304,8 @@ export default function App() {
               : undefined
           }
         >
-          {tab === 'hosts' && (
+          {pane(
+            'hosts',
             <HostsScreen
               store={store}
               live={live}
@@ -300,26 +313,38 @@ export default function App() {
               onDisconnect={disconnect}
               onConnect={connect}
               onEdit={h => setRoute({ name: 'editHost', host: h })}
-            />
+            />,
           )}
-          {tab === 'sessions' && (
+          {pane(
+            'sessions',
             <SessionsScreen
               live={live}
               onResume={openLive}
               onDisconnect={s => Ssh.disconnect(s.sessionId).catch(() => {})}
               onRefresh={refreshLive}
-            />
+            />,
           )}
-          {tab === 'identities' && (
-            <IdentitiesScreen store={store} onKeys={() => setTab('keys')} />
+          {pane(
+            'identities',
+            <IdentitiesScreen
+              store={store}
+              onKeys={() => {
+                setTab('keys');
+                setVisitedTabs(v => new Set(v).add('keys'));
+              }}
+            />,
           )}
-          {tab === 'keys' && (
-            <KeysScreen store={store} onBack={() => setTab('hosts')} embedded />
+          {pane(
+            'keys',
+            <KeysScreen store={store} onBack={() => setTab('hosts')} embedded />,
           )}
         </TabShell>
-      );
-      break;
-    }
+  );
+
+  let screen: React.ReactNode = null;
+  switch (route.name) {
+    case 'hosts':
+      break; // la vista de pestañas siempre montada (abajo)
     case 'settings':
       screen = (
         <SettingsScreen
@@ -376,7 +401,14 @@ export default function App() {
       <StatusBar barStyle="light-content" />
       {/* Bloqueado: no se pinta nada de la app (las sesiones siguen en nativo). */}
       {locked === false ? (
-        screen
+        <>
+          <View
+            style={route.name === 'hosts' ? appStyles.fill : appStyles.hidden}
+          >
+            {tabsView}
+          </View>
+          {screen}
+        </>
       ) : locked === true ? (
         <LockScreen onUnlocked={() => setLocked(false)} />
       ) : (

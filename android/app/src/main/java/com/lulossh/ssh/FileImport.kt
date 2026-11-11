@@ -48,11 +48,40 @@ class FileImport(private val rc: ReactApplicationContext) {
         }
         Thread {
             try {
-                rc.contentResolver.openOutputStream(uri, "wt")?.use {
-                    it.write(content.toByteArray(Charsets.UTF_8))
-                } ?: throw IllegalStateException("No se pudo abrir el destino")
-                promise.resolve(displayName(uri))
+                val bytes = content.toByteArray(Charsets.UTF_8)
+                // "w" lo soportan todos los proveedores; algunos (gestores de
+                // archivos de fabricante, Drive) fallan o ignoran "wt".
+                val modes = listOf("w", "wt", "rwt")
+                var written = false
+                var lastError: Exception? = null
+                for (mode in modes) {
+                    try {
+                        rc.contentResolver.openFileDescriptor(uri, mode)?.use { pfd ->
+                            java.io.FileOutputStream(pfd.fileDescriptor).use { out ->
+                                out.write(bytes)
+                                out.flush()
+                                out.fd.sync()
+                            }
+                        } ?: throw IllegalStateException("No se pudo abrir el destino")
+                        written = true
+                        break
+                    } catch (e: Exception) {
+                        android.util.Log.w("LuloSSH", "save mode=$mode: ${e.message}")
+                        lastError = e
+                    }
+                }
+                if (!written) throw lastError ?: IllegalStateException("No se pudo escribir")
+                val size = sizeOf(uri)
+                android.util.Log.i("LuloSSH", "backup guardado: ${bytes.size} bytes, proveedor dice ${size ?: "?"}")
+                promise.resolve(Arguments.createMap().apply {
+                    putString("name", displayName(uri))
+                    putDouble("bytes", bytes.size.toDouble())
+                    // Lo que dice el proveedor (Drive puede decir 0 mientras sube).
+                    if (size != null) putDouble("providerBytes", size.toDouble())
+                    putString("provider", uri.authority)
+                })
             } catch (e: Exception) {
+                android.util.Log.e("LuloSSH", "backup no guardado", e)
                 promise.reject("SAVE_ERROR", e.message, e)
             }
         }.start()
@@ -153,6 +182,15 @@ class FileImport(private val rc: ReactApplicationContext) {
             if (buf.size() > MAX_FILE) return ByteArray(MAX_FILE + 1) // se descarta en add()
         }
         return buf.toByteArray()
+    }
+
+    /** Tamaño según el proveedor (null si no lo informa). */
+    private fun sizeOf(uri: Uri): Long? = try {
+        rc.contentResolver.query(uri, arrayOf(OpenableColumns.SIZE), null, null, null)?.use { c ->
+            if (c.moveToFirst() && !c.isNull(0)) c.getLong(0) else null
+        }
+    } catch (_: Exception) {
+        null
     }
 
     private fun displayName(uri: Uri): String {

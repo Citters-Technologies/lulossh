@@ -35,14 +35,6 @@ export function TabShell({
         <Text style={local.brand}>
           Lulo<Text style={local.brandAccent}>SSH</Text>
         </Text>
-        <Pressable
-          onPress={onSettings}
-          hitSlop={8}
-          style={local.headerBtn}
-          accessibilityLabel="Ajustes"
-        >
-          <Text style={local.headerBtnText}>⚙</Text>
-        </Pressable>
         {action && (
           <Pressable
             onPress={action.onPress}
@@ -54,6 +46,15 @@ export function TabShell({
             </Text>
           </Pressable>
         )}
+        {/* Siempre el último: no se mueve al cambiar de pestaña. */}
+        <Pressable
+          onPress={onSettings}
+          hitSlop={8}
+          style={[local.headerBtn, local.gear]}
+          accessibilityLabel="Ajustes"
+        >
+          <Text style={local.gearText}>⚙️</Text>
+        </Pressable>
       </View>
       <View style={local.tabs}>
         {TABS.map(t => {
@@ -108,6 +109,16 @@ const local = StyleSheet.create({
   },
   headerBtnText: { color: colors.text, fontWeight: '600' },
   primary: { backgroundColor: colors.accent },
+  gear: {
+    width: 40,
+    height: 40,
+    paddingHorizontal: 0,
+    paddingVertical: 0,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 20,
+  },
+  gearText: { fontSize: 20 },
   primaryText: { color: '#fff' },
   tabs: {
     flexDirection: 'row',
