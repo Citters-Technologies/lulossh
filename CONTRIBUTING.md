@@ -6,13 +6,13 @@ Thanks for wanting to help!
 
 ## Contributor License Agreement (CLA)
 
-LuloSSH, owned by Citters Technologies SL, is released under the AGPL-3.0
+LuloSSH, owned by Citters Technologies SLU, is released under the AGPL-3.0
 and is also offered under a commercial license.
 To make that possible, by opening a pull request you agree that:
 
 1. You are the author of the contributed code or have the right to
    contribute it.
-2. You grant Citters Technologies SL (and anyone it designates) a perpetual,
+2. You grant Citters Technologies SLU (and anyone it designates) a perpetual,
    worldwide, royalty-free license to use, modify and distribute your
    contribution, including redistributing it under other licenses (such as
    the commercial one).
