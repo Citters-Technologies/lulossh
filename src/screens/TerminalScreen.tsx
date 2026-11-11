@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Alert, Pressable, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { AiTool, detectCommand, parseDetect } from '../ai/tools';
 import { KeyBar } from '../keyboard/KeyBar';
 import {
   applyCtrl,
@@ -42,6 +43,7 @@ export function TerminalScreen({
   const modsRef = useRef(mods);
   modsRef.current = mods;
   const keyboardHeight = useKeyboardHeight();
+  const [aiTools, setAiTools] = useState<AiTool[]>([]);
 
   // Tamaño de letra: teclas de volumen, persistido entre sesiones.
   const fontSize = useRef(FONT_DEFAULT);
@@ -213,6 +215,10 @@ export function TerminalScreen({
       connected.current = true;
       setStatus('Conectado');
       term.current?.focus();
+      // ¿Hay CLIs de IA en el destino? (canal aparte, no se ve en la terminal)
+      Ssh.exec(sessionId.current, detectCommand(), 8000)
+        .then(out => setAiTools(parseDetect(out)))
+        .catch(() => {});
     } catch (e: any) {
       const msg = e?.message ?? String(e);
       setStatus('Error');
@@ -259,6 +265,30 @@ export function TerminalScreen({
           onResize={onResize}
           onInput={onInput}
         />
+        {aiTools.length > 0 && (
+          <View style={styles.aiBar} pointerEvents="box-none">
+            {aiTools.map(t => (
+              <Pressable
+                key={t.id}
+                accessibilityLabel={`Reanudar chat de ${t.name}`}
+                onPress={() => send(`${t.command}\r`)}
+                onLongPress={() =>
+                  Alert.alert(t.name, `Escribe “${t.command}” en la shell.`)
+                }
+                hitSlop={6}
+                style={({ pressed }) => [
+                  styles.aiBtn,
+                  { borderColor: t.color },
+                  pressed && styles.aiBtnPressed,
+                ]}
+              >
+                <Text style={[styles.aiGlyph, { color: t.color }]}>
+                  {t.glyph}
+                </Text>
+              </Pressable>
+            ))}
+          </View>
+        )}
         {fontHint && (
           <View style={styles.hint} pointerEvents="none">
             <Text style={styles.hintText}>{fontHint}</Text>
@@ -307,4 +337,22 @@ const styles = StyleSheet.create({
     borderRadius: 14,
   },
   hintText: { color: '#fff', fontWeight: '600' },
+  aiBar: {
+    position: 'absolute',
+    top: 8,
+    right: 8,
+    gap: 8,
+  },
+  aiBtn: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(11,15,20,0.55)',
+    opacity: 0.45,
+  },
+  aiBtnPressed: { opacity: 1 },
+  aiGlyph: { fontSize: 18, fontWeight: '700' },
 });

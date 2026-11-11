@@ -314,6 +314,42 @@ class SshModule(private val rc: ReactApplicationContext) : ReactContextBaseJavaM
         }
     }
 
+    /**
+     * Ejecuta un comando en un canal aparte de la misma conexión (no toca la
+     * shell interactiva) y devuelve su salida estándar. Pensado para sondeos
+     * cortos; se corta a los timeoutMs o a los 64 KB.
+     */
+    @ReactMethod
+    fun exec(id: String, command: String, timeoutMs: Int, promise: Promise) {
+        val s = sessions[id] ?: return promise.reject("NO_SESSION", "Sesión inexistente")
+        pool.execute {
+            var ch: Session? = null
+            val killer = java.util.Timer(true)
+            try {
+                ch = s.client.startSession()
+                val cmd = ch.exec(command)
+                val chan = ch
+                killer.schedule(object : java.util.TimerTask() {
+                    override fun run() { try { chan.close() } catch (_: Exception) {} }
+                }, timeoutMs.toLong().coerceIn(1000, 30000))
+                val out = java.io.ByteArrayOutputStream()
+                val buf = ByteArray(4096)
+                val input = cmd.inputStream
+                while (out.size() < 65536) {
+                    val n = try { input.read(buf) } catch (_: Exception) { -1 }
+                    if (n < 0) break
+                    out.write(buf, 0, n)
+                }
+                promise.resolve(out.toString("UTF-8"))
+            } catch (e: Exception) {
+                promise.reject("EXEC_ERROR", e.message, e)
+            } finally {
+                killer.cancel()
+                try { ch?.close() } catch (_: Exception) {}
+            }
+        }
+    }
+
     @ReactMethod
     fun acceptHostKey(id: String, accept: Boolean, promise: Promise) {
         pendingHostKeys.remove(id)?.complete(accept)

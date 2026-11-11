@@ -46,6 +46,11 @@ export interface SshModuleSpec {
   resize(sessionId: string, cols: number, rows: number): Promise<void>;
   disconnect(sessionId: string): Promise<void>;
   acceptHostKey(sessionId: string, accept: boolean): Promise<void>;
+  /**
+   * Ejecuta un comando corto en un canal aparte de la misma conexión (no se
+   * ve en la terminal). Devuelve stdout.
+   */
+  exec(sessionId: string, command: string, timeoutMs: number): Promise<string>;
 
   /**
    * Vault cifrado (Keystore/Keychain). Si el usuario no se ha autenticado
