@@ -1,14 +1,32 @@
 import React, { useState } from 'react';
-import { expectExternalActivity } from '../ui/appLock';
-import { Alert, ScrollView, Share, Text, View } from 'react-native';
+import {
+  Alert,
+  Pressable,
+  ScrollView,
+  Share,
+  StyleSheet,
+  Text,
+  View,
+} from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { isPrivateKeyText } from '../import/xshell';
 import { Ssh } from '../native/SshModule';
 import { SshKey } from '../store/models';
 import { Store } from '../store/useStore';
-import { Button, Field, Header, Segmented, styles } from '../ui/kit';
+import { expectExternalActivity } from '../ui/appLock';
+import { Button, colors, Field, Header, styles } from '../ui/kit';
 
 type Mode = 'list' | 'generate' | 'import';
+
+/** Tipo legible: "ssh-ed25519" -> "ED25519", "ecdsa-sha2-nistp256" -> "ECDSA". */
+const shortType = (t: string) =>
+  t.replace(/^ssh-/, '').replace(/^ecdsa-sha2-.*/, 'ecdsa').toUpperCase();
+
+/** Final de la clave pública, para distinguirlas a simple vista. */
+const tail = (pub: string) => {
+  const blob = pub.split(' ')[1] ?? '';
+  return blob.length > 12 ? `…${blob.slice(-12)}` : blob;
+};
 
 export function KeysScreen({
   store,
@@ -24,6 +42,7 @@ export function KeysScreen({
   const [name, setName] = useState('');
   const [pem, setPem] = useState('');
   const [passphrase, setPassphrase] = useState('');
+  const [pasting, setPasting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
@@ -32,7 +51,17 @@ export function KeysScreen({
     setName('');
     setPem('');
     setPassphrase('');
+    setPasting(false);
     setError(null);
+  };
+
+  const usage = (k: SshKey) => {
+    const uses = (a: { type: string; keyId?: string }) =>
+      a.type === 'privateKey' && a.keyId === k.id;
+    return (
+      store.hosts.filter(h => uses(h.auth as any)).length +
+      store.identities.filter(i => uses(i.auth as any)).length
+    );
   };
 
   const run = async (op: () => Promise<SshKey>) => {
@@ -75,13 +104,15 @@ export function KeysScreen({
     }
   };
 
-  /** Carga la clave desde un archivo (id_ed25519, .pem, .key, .ppk…). */
-  const pickFile = async () => {
+  /** Importar: abre directamente el selector de archivos. */
+  const startImport = async () => {
     setError(null);
+    setMode('import');
     try {
       expectExternalActivity();
       const entries = await Ssh.pickImportFiles();
       if (!entries.length) {
+        setPasting(true); // canceló: ofrecer pegar el texto
         return;
       }
       const found = entries.filter(e => isPrivateKeyText(e.text));
@@ -90,26 +121,30 @@ export function KeysScreen({
           'No es una clave privada. Si elegiste la .pub, elige el archivo ' +
             'sin extensión (p. ej. id_ed25519).',
         );
+        setPasting(true);
         return;
       }
       const f = found[0];
       setPem(f.text);
-      if (!name.trim()) {
-        setName((f.path.split('/').pop() ?? '').replace(/\.[^.]+$/, ''));
-      }
+      setName((f.path.split('/').pop() ?? '').replace(/\.[^.]+$/, ''));
       if (found.length > 1) {
         setError(
-          `Había ${found.length} claves; cargada “${f.path}”. ` +
-            'Impórtalas de una en una.',
+          `Había ${found.length} claves; cargada “${f.path}”. Impórtalas de una en una.`,
         );
       }
     } catch (e: any) {
       setError(e?.message ?? String(e));
+      setPasting(true);
     }
   };
 
   const sharePublic = (k: SshKey) =>
     Share.share({ title: `Clave pública ${k.name}`, message: k.publicKey });
+
+  const copyPublic = (k: SshKey) => {
+    Ssh.copyText(k.publicKey);
+    Alert.alert('Copiada', `Clave pública de “${k.name}” en el portapapeles.`);
+  };
 
   const remove = (k: SshKey) =>
     Alert.alert(
@@ -138,105 +173,228 @@ export function KeysScreen({
         />
       )}
       <ScrollView
-        contentContainerStyle={styles.body}
+        contentContainerStyle={local.body}
         keyboardShouldPersistTaps="handled"
       >
-        <Segmented
-          value={mode}
-          onChange={m => {
-            setError(null);
-            setMode(m);
-          }}
-          options={[
-            { value: 'list', label: 'Mis claves' },
-            { value: 'generate', label: 'Generar' },
-            { value: 'import', label: 'Importar' },
-          ]}
-        />
-        {error && <Text style={styles.error}>{error}</Text>}
-
         {mode === 'list' && (
           <>
+            <View style={local.actions}>
+              <Pill label="＋ Generar" primary onPress={() => setMode('generate')} />
+              <Pill label="⇪ Importar" onPress={startImport} />
+            </View>
+            {error && <Text style={styles.error}>{error}</Text>}
             {store.keys.length === 0 && (
-              <Text style={styles.empty}>
-                No hay claves. Genera una ed25519 o importa la tuya.
+              <View style={local.empty}>
+                <Text style={local.emptyIcon}>🔑</Text>
+                <Text style={local.emptyTitle}>Sin claves</Text>
+                <Text style={styles.rowSub}>
+                  Genera una ed25519 o importa la tuya (OpenSSH, PEM o .ppk).
+                </Text>
+              </View>
+            )}
+            {store.keys.map(k => {
+              const n = usage(k);
+              return (
+                <View key={k.id} style={local.card}>
+                  <View style={local.avatar}>
+                    <Text style={local.avatarText}>🔑</Text>
+                  </View>
+                  <View style={local.text}>
+                    <Text style={local.name} numberOfLines={1}>
+                      {k.name}
+                    </Text>
+                    <Text style={local.sub} numberOfLines={1}>
+                      <Text style={local.badge}>{shortType(k.type)}</Text>
+                      {'  '}
+                      {tail(k.publicKey)}
+                      {n ? ` · ${n} en uso` : ''}
+                    </Text>
+                  </View>
+                  <Icon label="⧉" hint="Copiar clave pública" onPress={() => copyPublic(k)} />
+                  <Icon label="⤴" hint="Compartir clave pública" onPress={() => sharePublic(k)} />
+                  <Icon label="🗑" hint="Borrar clave" onPress={() => remove(k)} />
+                </View>
+              );
+            })}
+            {store.keys.length > 0 && (
+              <Text style={local.hint}>
+                ⧉ copia y ⤴ comparte la clave pública, lista para
+                ~/.ssh/authorized_keys.
               </Text>
             )}
-            {store.keys.map(k => (
-              <View key={k.id} style={styles.row}>
-                <Text style={styles.rowTitle}>{k.name}</Text>
-                <Text style={styles.rowSub}>{k.type}</Text>
-                <Text style={styles.rowSub} numberOfLines={1}>
-                  {k.publicKey}
-                </Text>
-                <Button
-                  title="Compartir clave pública"
-                  kind="secondary"
-                  onPress={() => sharePublic(k)}
-                />
-                <Button
-                  title="Borrar"
-                  kind="danger"
-                  onPress={() => remove(k)}
-                />
-              </View>
-            ))}
           </>
         )}
 
         {mode === 'generate' && (
-          <>
+          <View style={local.form}>
+            <Text style={local.formTitle}>Nueva clave ed25519</Text>
+            {error && <Text style={styles.error}>{error}</Text>}
             <Field
-              label="Nombre / comentario"
+              label="Nombre"
               value={name}
               onChangeText={setName}
               placeholder="movil-david"
+              autoFocus
             />
-            <Text style={styles.rowSub}>
-              Se genera una clave ed25519. La privada nunca sale del dispositivo
-              sin cifrar; después podrás compartir la pública para añadirla a
-              ~/.ssh/authorized_keys.
+            <Text style={local.sub}>
+              La privada nunca sale del dispositivo sin cifrar. Después podrás
+              copiar la pública al servidor.
             </Text>
-            <Button
-              title="Generar ed25519"
-              disabled={busy || !name.trim()}
-              onPress={() => run(() => store.generateKey(name.trim()))}
-            />
-          </>
+            <View style={local.formButtons}>
+              <Pill label="Cancelar" onPress={reset} />
+              <Pill
+                label={busy ? 'Generando…' : 'Generar'}
+                primary
+                disabled={busy || !name.trim()}
+                onPress={() => run(() => store.generateKey(name.trim()))}
+              />
+            </View>
+          </View>
         )}
 
         {mode === 'import' && (
-          <>
-            <Button
-              title="Elegir archivo…"
-              kind="secondary"
-              disabled={busy}
-              onPress={pickFile}
-            />
+          <View style={local.form}>
+            <Text style={local.formTitle}>Importar clave</Text>
+            {error && <Text style={styles.error}>{error}</Text>}
+            {pem && !pasting ? (
+              <Text style={local.loaded}>✓ Clave cargada del archivo</Text>
+            ) : (
+              <Field
+                label="Pega la clave privada (OpenSSH, PEM o .ppk)"
+                value={pem}
+                onChangeText={setPem}
+                multiline
+                placeholder="-----BEGIN OPENSSH PRIVATE KEY-----"
+              />
+            )}
             <Field label="Nombre" value={name} onChangeText={setName} />
-            <Field
-              label="Clave privada (OpenSSH, PEM o PuTTY .ppk)"
-              value={pem}
-              onChangeText={setPem}
-              multiline
-              placeholder="-----BEGIN OPENSSH PRIVATE KEY-----"
-            />
             <Field
               label="Passphrase (si tiene)"
               value={passphrase}
               onChangeText={setPassphrase}
               secureTextEntry
             />
-            <Button
-              title="Importar"
-              disabled={busy || !name.trim() || !isPrivateKeyText(pem)}
-              onPress={() =>
-                run(() => store.importKey(name.trim(), pem, passphrase))
-              }
-            />
-          </>
+            <View style={local.formButtons}>
+              <Pill label="Cancelar" onPress={reset} />
+              <Pill label="Otro archivo…" onPress={startImport} />
+              <Pill
+                label={busy ? 'Importando…' : 'Importar'}
+                primary
+                disabled={busy || !name.trim() || !isPrivateKeyText(pem)}
+                onPress={() => run(() => store.importKey(name.trim(), pem, passphrase))}
+              />
+            </View>
+          </View>
         )}
       </ScrollView>
     </Root>
   );
 }
+
+function Pill({
+  label,
+  onPress,
+  primary,
+  disabled,
+}: {
+  label: string;
+  onPress(): void;
+  primary?: boolean;
+  disabled?: boolean;
+}) {
+  return (
+    <Pressable
+      onPress={onPress}
+      disabled={disabled}
+      style={({ pressed }) => [
+        local.pill,
+        primary && local.pillPrimary,
+        (pressed || disabled) && local.dim,
+      ]}
+    >
+      <Text style={[local.pillText, primary && local.pillTextPrimary]}>{label}</Text>
+    </Pressable>
+  );
+}
+
+function Icon({
+  label,
+  hint,
+  onPress,
+}: {
+  label: string;
+  hint: string;
+  onPress(): void;
+}) {
+  return (
+    <Pressable
+      onPress={onPress}
+      hitSlop={6}
+      accessibilityLabel={hint}
+      style={({ pressed }) => [local.icon, pressed && local.iconPressed]}
+    >
+      <Text style={local.iconText}>{label}</Text>
+    </Pressable>
+  );
+}
+
+const local = StyleSheet.create({
+  body: { padding: 16, paddingBottom: 32 },
+  actions: { flexDirection: 'row', gap: 8, marginBottom: 12 },
+  pill: {
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 18,
+    backgroundColor: colors.surface,
+  },
+  pillPrimary: { backgroundColor: colors.accent },
+  pillText: { color: colors.text, fontWeight: '600' },
+  pillTextPrimary: { color: '#fff' },
+  dim: { opacity: 0.5 },
+  card: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    backgroundColor: colors.surface,
+    borderRadius: 14,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    marginBottom: 8,
+  },
+  avatar: {
+    width: 36,
+    height: 36,
+    borderRadius: 10,
+    backgroundColor: '#f59e0b26',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  avatarText: { fontSize: 17 },
+  text: { flex: 1 },
+  name: { color: '#fff', fontSize: 15, fontWeight: '600' },
+  sub: { color: colors.muted, fontSize: 12, marginTop: 2 },
+  badge: { color: '#f5b301', fontWeight: '700' },
+  icon: {
+    width: 34,
+    height: 34,
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  iconPressed: { backgroundColor: colors.surface2 },
+  iconText: { color: colors.text, fontSize: 17 },
+  hint: { color: '#5b6b7c', fontSize: 12, textAlign: 'center', marginTop: 12 },
+  empty: { alignItems: 'center', marginTop: 40, gap: 6 },
+  emptyIcon: { fontSize: 36 },
+  emptyTitle: { color: '#fff', fontSize: 17, fontWeight: '700' },
+  form: { backgroundColor: colors.surface, borderRadius: 14, padding: 14, gap: 4 },
+  formTitle: { color: '#fff', fontSize: 16, fontWeight: '700', marginBottom: 8 },
+  formButtons: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    flexWrap: 'wrap',
+    gap: 8,
+    marginTop: 8,
+  },
+  loaded: { color: '#22c55e', fontWeight: '600', marginBottom: 10 },
+});
