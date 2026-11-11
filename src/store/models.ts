@@ -18,6 +18,8 @@ export interface Host {
   /** Veces que se ha conectado (para "Usados con frecuencia"). */
   useCount?: number;
   favorite?: boolean;
+  /** SO detectado al conectar (ID de os-release: "ubuntu", "debian"…). */
+  os?: string;
   /**
    * Nombre de la clave en el cliente de origen (p. ej. UserKey de Xshell).
    * Sirve para enlazarla si se importa más tarde.

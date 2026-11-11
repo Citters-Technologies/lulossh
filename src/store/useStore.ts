@@ -22,6 +22,7 @@ const IDENTITIES = 'identities';
 /** `enabled`: no leer el vault hasta que la app esté desbloqueada. */
 export function useStore(enabled = true) {
   const [hosts, setHosts] = useState<Host[]>([]);
+  const hostsRef = useRef<Host[]>([]);
   const [keys, setKeys] = useState<SshKey[]>([]);
   const [identities, setIdentities] = useState<Identity[]>([]);
   const [loaded, setLoaded] = useState(false);
@@ -35,6 +36,7 @@ export function useStore(enabled = true) {
         await readJson<SshKey[]>(KEYS, []),
         await readJson<Identity[]>(IDENTITIES, []),
       ];
+      hostsRef.current = h;
       setHosts(h);
       setKeys(k);
       setIdentities(i);
@@ -52,7 +54,10 @@ export function useStore(enabled = true) {
     }
   }, [enabled, load]);
 
+  // Última lista conocida: los parches seguidos (huella, SO, uso) no se pisan.
+  // (Solo se actualiza al cargar y al guardar, nunca desde el render.)
   const saveHosts = async (next: Host[]) => {
+    hostsRef.current = next;
     await writeJson(HOSTS, next);
     setHosts(next);
   };
@@ -89,10 +94,10 @@ export function useStore(enabled = true) {
 
     /** Al borrar una identidad, sus hosts quedan con sus propios datos. */
     deleteIdentity: async (id: string) => {
-      const users = hosts.filter(h => h.identityId === id);
+      const users = hostsRef.current.filter(h => h.identityId === id);
       if (users.length) {
         await saveHosts(
-          hosts.map(h =>
+          hostsRef.current.map(h =>
             h.identityId === id ? { ...h, identityId: undefined } : h,
           ),
         );
@@ -103,7 +108,7 @@ export function useStore(enabled = true) {
     /** Deja la identidad exactamente en estos hosts (quita del resto). */
     setIdentityHosts: (identityId: string, hostIds: string[]) =>
       saveHosts(
-        hosts.map(h =>
+        hostsRef.current.map(h =>
           hostIds.includes(h.id)
             ? { ...h, identityId }
             : h.identityId === identityId
@@ -115,7 +120,7 @@ export function useStore(enabled = true) {
     /** Asigna (o quita, con null) una identidad a varios hosts de una vez. */
     assignIdentity: (identityId: string | null, hostIds: string[]) =>
       saveHosts(
-        hosts.map(h =>
+        hostsRef.current.map(h =>
           hostIds.includes(h.id)
             ? { ...h, identityId: identityId ?? undefined }
             : h,
@@ -126,18 +131,20 @@ export function useStore(enabled = true) {
 
     upsertHost: (h: Omit<Host, 'id'> & { id?: string }) => {
       const host: Host = { ...h, id: h.id ?? newId() };
-      const exists = hosts.some(x => x.id === host.id);
+      const exists = hostsRef.current.some(x => x.id === host.id);
       return saveHosts(
         exists
-          ? hosts.map(x => (x.id === host.id ? host : x))
-          : [...hosts, host],
+          ? hostsRef.current.map(x => (x.id === host.id ? host : x))
+          : [...hostsRef.current, host],
       );
     },
 
-    deleteHost: (id: string) => saveHosts(hosts.filter(h => h.id !== id)),
+    deleteHost: (id: string) => saveHosts(hostsRef.current.filter(h => h.id !== id)),
 
     patchHost: (id: string, patch: Partial<Host>) =>
-      saveHosts(hosts.map(h => (h.id === id ? { ...h, ...patch } : h))),
+      saveHosts(
+        hostsRef.current.map(h => (h.id === id ? { ...h, ...patch } : h)),
+      ),
 
     generateKey: async (name: string) => {
       const id = newId();
@@ -193,7 +200,7 @@ export function useStore(enabled = true) {
         await saveKeys(allKeys);
       }
 
-      const plan = planImport(hosts, allKeys, data.hosts, newId, identities);
+      const plan = planImport(hostsRef.current, allKeys, data.hosts, newId, identities);
       const visible = plan.toUpdate.filter(u => u.changes.length);
       const apply =
         visible.length === 0 ? true : await confirmUpdates(visible);
@@ -203,7 +210,7 @@ export function useStore(enabled = true) {
           .map(u => [u.id, u.patch]),
       );
       const next = [
-        ...hosts.map(h => (updates.has(h.id) ? { ...h, ...updates.get(h.id) } : h)),
+        ...hostsRef.current.map(h => (updates.has(h.id) ? { ...h, ...updates.get(h.id) } : h)),
         ...plan.toAdd,
       ];
       if (plan.toAdd.length || updates.size) {
@@ -222,12 +229,12 @@ export function useStore(enabled = true) {
 
     /** Hosts importados que esperaban esta clave (por nombre). */
     hostsWaitingForKey: (key: SshKey) =>
-      hostsWaitingForKey(hosts, keys, key.name, identities),
+      hostsWaitingForKey(hostsRef.current, keys, key.name, identities),
 
     /** Asigna una clave a varios hosts de una vez. */
     assignKey: (keyId: string, hostIds: string[]) =>
       saveHosts(
-        hosts.map(h =>
+        hostsRef.current.map(h =>
           hostIds.includes(h.id)
             ? { ...h, auth: { type: 'privateKey', keyId }, identityId: undefined }
             : h,
@@ -236,14 +243,14 @@ export function useStore(enabled = true) {
 
     /** Mover/renombrar una carpeta con todo su contenido. */
     renameFolder: (from: string, to: string) =>
-      saveHosts(renameFolder(hosts, from, to)),
+      saveHosts(renameFolder(hostsRef.current, from, to)),
 
     /** No se puede borrar una clave en uso por algún host o identidad. */
     deleteKey: async (id: string) => {
       const uses = (a: Host['auth']) =>
         a.type === 'privateKey' && a.keyId === id;
       const users = [
-        ...hosts.filter(h => uses(h.auth)).map(h => h.name),
+        ...hostsRef.current.filter(h => uses(h.auth)).map(h => h.name),
         ...identities.filter(i => uses(i.auth)).map(i => `identidad ${i.name}`),
       ];
       if (users.length) {

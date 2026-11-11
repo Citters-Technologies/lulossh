@@ -355,6 +355,9 @@ export default function App() {
           onHostKeyAccepted={fp =>
             store.patchHost(route.host.id, { fingerprint: fp }).catch(() => {})
           }
+          onOsDetected={os =>
+            store.patchHost(route.host.id, { os }).catch(() => {})
+          }
         />
       );
       break;

@@ -14,6 +14,7 @@ import { parseImport } from '../import/xshell';
 import { LiveSession, Ssh } from '../native/SshModule';
 import { buildTree, FolderNode, normPath, splitPath } from '../store/folders';
 import { Host, hostLabel } from '../store/models';
+import { osBadge } from '../remote/osInfo';
 import { byName, colorFor, favorites, frequent } from '../store/ranking';
 import { Store } from '../store/useStore';
 import { Button, colors, Field, styles } from '../ui/kit';
@@ -407,7 +408,8 @@ function HostRow({
   onStar(): void;
 }) {
   const label = h.name || h.host;
-  const tint = colorFor(normPath(h.group) ?? label);
+  const os = osBadge(h.os);
+  const tint = os?.color ?? colorFor(normPath(h.group) ?? label);
   return (
     <Pressable
       onPress={onPress}
@@ -419,9 +421,16 @@ function HostRow({
         pressed && local.pressed,
       ]}
     >
-      <View style={[local.avatar, { backgroundColor: tint + '33' }]}>
-        <Text style={[local.avatarText, { color: tint }]}>
-          {label.slice(0, 1).toUpperCase()}
+      <View
+        style={[local.avatar, { backgroundColor: tint + '33' }]}
+        accessibilityLabel={os?.name}
+      >
+        <Text
+          style={[local.avatarText, os && local.avatarOs, { color: tint }]}
+          numberOfLines={1}
+          adjustsFontSizeToFit
+        >
+          {os ? os.label : label.slice(0, 1).toUpperCase()}
         </Text>
         {live && <View style={local.liveDot} />}
       </View>
@@ -520,6 +529,7 @@ const local = StyleSheet.create({
     justifyContent: 'center',
   },
   avatarText: { fontSize: 18, fontWeight: '800' },
+  avatarOs: { fontSize: 13, letterSpacing: 0.5, paddingHorizontal: 3 },
   liveDot: {
     position: 'absolute',
     right: -2,

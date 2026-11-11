@@ -10,6 +10,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { AiTool, detectCommand, parseDetect } from '../ai/tools';
+import { osCommand, parseOs } from '../remote/osInfo';
 import { LAYOUT_PREF, parseLayout } from '../keyboard/catalog';
 import { KeyBar } from '../keyboard/KeyBar';
 import {
@@ -37,6 +38,7 @@ export function TerminalScreen({
   resume: resumeSession = false,
   onClose,
   onHostKeyAccepted,
+  onOsDetected,
 }: {
   host: Host;
   /**
@@ -50,6 +52,8 @@ export function TerminalScreen({
   onClose(): void;
   /** Para guardar la huella y no volver a preguntar. */
   onHostKeyAccepted(fingerprint: string): void;
+  /** SO del servidor detectado (para el icono en la lista). */
+  onOsDetected?(os: string): void;
 }) {
   const term = useRef<TerminalHandle>(null);
   const sessionId = useRef(initialId);
@@ -287,9 +291,18 @@ export function TerminalScreen({
     };
   }, [handleEvent]);
 
+  // Un solo canal aparte (no se ve en la terminal): CLIs de IA + SO remoto.
+  const osRef = useRef(onOsDetected);
+  osRef.current = onOsDetected;
   const probeAiTools = () =>
-    Ssh.exec(sessionId.current, detectCommand(), 8000)
-      .then(out => setAiTools(parseDetect(out)))
+    Ssh.exec(sessionId.current, `${detectCommand()}; ${osCommand()}`, 8000)
+      .then(out => {
+        setAiTools(parseDetect(out));
+        const os = parseOs(out);
+        if (os && os !== host.os) {
+          osRef.current?.(os);
+        }
+      })
       .catch(() => {});
 
   const resume = async (size: { cols: number; rows: number }) => {
