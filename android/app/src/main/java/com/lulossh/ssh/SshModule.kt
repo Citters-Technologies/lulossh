@@ -187,6 +187,57 @@ class SshModule(private val rc: ReactApplicationContext) : ReactContextBaseJavaM
         }
     }
 
+    /**
+     * Copia de seguridad cifrada con contraseña. `metaJson` trae hosts,
+     * identidades, metadatos de claves y ajustes; aquí se añaden las claves
+     * privadas (y sus passphrases) del vault. Resuelve con el nombre del
+     * fichero guardado, o null si el usuario cancela.
+     */
+    @ReactMethod
+    fun exportBackup(metaJson: String, keyIds: com.facebook.react.bridge.ReadableArray, password: String,
+                     fileName: String, promise: Promise) {
+        pool.execute {
+            val content = try {
+                val secrets = org.json.JSONObject()
+                for (i in 0 until keyIds.size()) {
+                    val id = keyIds.getString(i) ?: continue
+                    val pem = vault.get(KeyVault.privateKeyName(id)) ?: continue
+                    secrets.put(id, org.json.JSONObject().apply {
+                        put("pem", pem)
+                        vault.get(KeyVault.passphraseName(id))?.let { put("passphrase", it) }
+                    })
+                }
+                val payload = org.json.JSONObject().apply {
+                    put("exportedAt", System.currentTimeMillis())
+                    put("meta", org.json.JSONObject(metaJson))
+                    put("secrets", secrets)
+                }
+                Backup.encrypt(payload.toString(), password)
+            } catch (e: VaultLockedException) {
+                return@execute promise.reject("LOCKED", "Vault bloqueado", e)
+            } catch (e: Exception) {
+                return@execute promise.reject("BACKUP_ERROR", e.message, e)
+            }
+            val activity = rc.currentActivity
+                ?: return@execute promise.reject("NO_ACTIVITY", "No hay actividad en primer plano")
+            activity.runOnUiThread { fileImport.save(promise, fileName, content) }
+        }
+    }
+
+    /** Descifra una copia; devuelve el JSON con meta y secrets (claves privadas). */
+    @ReactMethod
+    fun decryptBackup(content: String, password: String, promise: Promise) {
+        pool.execute {
+            try {
+                promise.resolve(Backup.decrypt(content, password))
+            } catch (e: Backup.BadPassword) {
+                promise.reject("BAD_PASSWORD", e.message, e)
+            } catch (e: Exception) {
+                promise.reject("BACKUP_ERROR", e.message, e)
+            }
+        }
+    }
+
     private val fileImport by lazy { FileImport(rc) }
 
     /** Selector de ficheros para importar; resuelve con [{path, text}] ([] si se cancela). */

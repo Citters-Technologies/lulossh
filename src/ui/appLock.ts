@@ -27,6 +27,18 @@ export async function loadLockSettings(): Promise<LockSettings> {
   };
 }
 
+// Selectores del sistema que abre la propia app (ficheros, permisos): salir a
+// ellos no debe bloquear la app a mitad de la operación.
+let externalUntil = 0;
+export const expectExternalActivity = (ms = 5 * 60_000) => {
+  externalUntil = Date.now() + ms;
+};
+export const consumeExternalActivity = (): boolean => {
+  const was = Date.now() < externalUntil;
+  externalUntil = 0;
+  return was;
+};
+
 /** ¿Hay que bloquear al volver tras `elapsedMs` en segundo plano? */
 export const shouldRelock = (s: LockSettings, elapsedMs: number) =>
   s.enabled && elapsedMs >= s.afterSec * 1000;

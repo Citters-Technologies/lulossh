@@ -118,6 +118,21 @@ export interface SshModuleSpec {
   isJuiceSshInstalled(): Promise<boolean>;
   readJuiceSsh(): Promise<JuiceData>;
 
+  /**
+   * Copia de seguridad cifrada con contraseña (scrypt + AES-256-GCM). Nativo
+   * añade las claves privadas del vault y abre "Guardar como". Resuelve con el
+   * nombre del fichero, o null si se cancela. Falla con 'LOCKED' si el vault
+   * está bloqueado.
+   */
+  exportBackup(
+    metaJson: string,
+    keyIds: string[],
+    password: string,
+    fileName: string,
+  ): Promise<string | null>;
+  /** Descifra una copia (falla con code 'BAD_PASSWORD'). Devuelve JSON. */
+  decryptBackup(content: string, password: string): Promise<string>;
+
   /** Portapapeles del sistema. */
   copyText(text: string): void;
   pasteText(): Promise<string | null>;

@@ -16,7 +16,12 @@ import { Tab, TabShell } from './src/ui/TabShell';
 import { Direction, Transition } from './src/ui/Transition';
 import { LockScreen } from './src/screens/LockScreen';
 import { SettingsScreen } from './src/screens/SettingsScreen';
-import { loadLockSettings, LockSettings, shouldRelock } from './src/ui/appLock';
+import {
+  consumeExternalActivity,
+  loadLockSettings,
+  LockSettings,
+  shouldRelock,
+} from './src/ui/appLock';
 import { colors } from './src/ui/kit';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { importFromJuiceSsh } from './src/import/ui';
@@ -94,7 +99,8 @@ export default function App() {
       } else if (st === 'active' && backgroundAt.current != null) {
         const away = Date.now() - backgroundAt.current;
         backgroundAt.current = null;
-        if (shouldRelock(lockSettings.current, away)) {
+        const ownPicker = consumeExternalActivity();
+        if (!ownPicker && shouldRelock(lockSettings.current, away)) {
           setLocked(true);
         }
       }
@@ -349,6 +355,7 @@ export default function App() {
     case 'settings':
       screen = (
         <SettingsScreen
+          store={store}
           onBack={home}
           onEditKeyBar={() => setRoute({ name: 'keybar' })}
           onLockChange={s => (lockSettings.current = s)}

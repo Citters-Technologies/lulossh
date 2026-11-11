@@ -1,5 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import {
+  Alert,
+  Modal,
   Linking,
   Pressable,
   ScrollView,
@@ -11,26 +13,117 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ssh } from '../native/SshModule';
 import {
+  expectExternalActivity,
   loadLockSettings,
   LOCK_AFTER_OPTIONS,
   LOCK_AFTER_PREF,
   LOCK_PREF,
   LockSettings,
 } from '../ui/appLock';
-import { colors, Header, Segmented, styles } from '../ui/kit';
+import { parsePayload } from '../store/backup';
+import { Store } from '../store/useStore';
+import { Button, colors, Field, Header, Segmented, styles } from '../ui/kit';
 
 const REPO = 'https://github.com/Citters-Technologies/lulossh';
 
 export function SettingsScreen({
+  store,
   onBack,
   onEditKeyBar,
   onLockChange,
 }: {
+  store: Store;
   onBack(): void;
   onEditKeyBar(): void;
   onLockChange(s: LockSettings): void;
 }) {
   const [lock, setLock] = useState<LockSettings | null>(null);
+  const [pw, setPw] = useState<{
+    mode: 'export' | 'restore';
+    a: string;
+    b: string;
+    file?: string;
+  } | null>(null);
+  const [pwError, setPwError] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+
+  useEffect(() => setPwError(null), [pw?.mode]);
+
+  const doExport = async () => {
+    if (!pw) {
+      return;
+    }
+    if (pw.a.length < 8) {
+      setPwError('Usa al menos 8 caracteres');
+      return;
+    }
+    if (pw.a !== pw.b) {
+      setPwError('Las contraseñas no coinciden');
+      return;
+    }
+    setBusy(true);
+    try {
+      expectExternalActivity();
+      const name = await store.exportBackup(pw.a);
+      setPw(null);
+      if (name) {
+        Alert.alert(
+          'Copia exportada',
+          `Guardada como “${name}”. Guárdala fuera del móvil (Drive, PC…) junto con su contraseña.`,
+        );
+      }
+    } catch (e: any) {
+      setPwError(e?.message ?? String(e));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const pickBackup = async () => {
+    try {
+      expectExternalActivity();
+      const entries = await Ssh.pickImportFiles();
+      if (!entries.length) {
+        return;
+      }
+      setPw({ mode: 'restore', a: '', b: '', file: entries[0].text });
+    } catch (e: any) {
+      Alert.alert('Error', e?.message ?? String(e));
+    }
+  };
+
+  const doRestore = async () => {
+    if (!pw?.file) {
+      return;
+    }
+    setBusy(true);
+    try {
+      const payload = parsePayload(await Ssh.decryptBackup(pw.file, pw.a));
+      const r = await store.restoreBackup(payload);
+      setPw(null);
+      Alert.alert(
+        'Copia restaurada',
+        [
+          `${r.hosts} hosts, ${r.identities} identidades y ${r.keys} claves añadidos.`,
+          r.hosts + r.identities + r.keys === 0
+            ? 'Ya tenías todo lo que traía la copia.'
+            : '',
+          ...r.notes,
+          'Los ajustes de la botonera y el bloqueo se aplican al reabrir la app.',
+        ]
+          .filter(Boolean)
+          .join('\n'),
+      );
+    } catch (e: any) {
+      setPwError(
+        e?.code === 'BAD_PASSWORD'
+          ? 'Contraseña incorrecta (o fichero dañado)'
+          : e?.message ?? String(e),
+      );
+    } finally {
+      setBusy(false);
+    }
+  };
   useEffect(() => {
     loadLockSettings().then(setLock);
   }, []);
@@ -90,6 +183,20 @@ export function SettingsScreen({
           )}
         </View>
 
+        <Text style={styles.section}>Copia de seguridad</Text>
+        <Item
+          icon="⬆"
+          title="Exportar copia cifrada"
+          sub={`Hosts, identidades, claves privadas y ajustes, protegidos con una contraseña. ${store.hosts.length} hosts · ${store.identities.length} identidades · ${store.keys.length} claves`}
+          onPress={() => setPw({ mode: 'export', a: '', b: '' })}
+        />
+        <Item
+          icon="⬇"
+          title="Restaurar copia"
+          sub="Añade lo que falte desde un fichero .lulossh (no borra nada)"
+          onPress={pickBackup}
+        />
+
         <Text style={styles.section}>Terminal</Text>
         <Item
           icon="⌨"
@@ -106,6 +213,57 @@ export function SettingsScreen({
           onPress={() => Linking.openURL(REPO)}
         />
       </ScrollView>
+
+      <Modal
+        visible={!!pw}
+        transparent
+        animationType="fade"
+        onRequestClose={() => {
+          if (!busy) {
+            setPw(null);
+          }
+        }}
+      >
+        <View style={local.backdrop}>
+          <View style={local.dialog}>
+            <Text style={local.title}>
+              {pw?.mode === 'export' ? 'Contraseña de la copia' : 'Abrir copia'}
+            </Text>
+            <Text style={local.sub}>
+              {pw?.mode === 'export'
+                ? 'La necesitarás para restaurar. Si la olvidas, la copia no se puede abrir: guárdala en tu gestor de contraseñas.'
+                : 'Escribe la contraseña con la que exportaste la copia.'}
+            </Text>
+            <Field
+              label="Contraseña"
+              value={pw?.a ?? ''}
+              onChangeText={a => setPw(p => (p ? { ...p, a } : p))}
+              secureTextEntry
+              autoFocus
+            />
+            {pw?.mode === 'export' && (
+              <Field
+                label="Repite la contraseña"
+                value={pw.b}
+                onChangeText={b => setPw(p => (p ? { ...p, b } : p))}
+                secureTextEntry
+              />
+            )}
+            {pwError && <Text style={styles.error}>{pwError}</Text>}
+            <Button
+              title={busy ? 'Un momento…' : pw?.mode === 'export' ? 'Exportar' : 'Restaurar'}
+              disabled={busy}
+              onPress={pw?.mode === 'export' ? doExport : doRestore}
+            />
+            <Button
+              title="Cancelar"
+              kind="secondary"
+              disabled={busy}
+              onPress={() => setPw(null)}
+            />
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -151,4 +309,16 @@ const local = StyleSheet.create({
   icon: { fontSize: 20, width: 28, textAlign: 'center' },
   chev: { color: colors.muted, fontSize: 22 },
   pressed: { backgroundColor: colors.surface2 },
+  backdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.6)',
+    justifyContent: 'center',
+    padding: 24,
+  },
+  dialog: {
+    backgroundColor: colors.surface,
+    borderRadius: 12,
+    padding: 16,
+    gap: 6,
+  },
 });

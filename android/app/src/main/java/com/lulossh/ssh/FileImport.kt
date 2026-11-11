@@ -22,8 +22,45 @@ class FileImport(private val rc: ReactApplicationContext) {
 
     private var pending: Promise? = null
 
+    private var pendingSave: Pair<Promise, String>? = null
+
+    /** Guarda `content` donde elija el usuario (Descargas, Drive…). Resuelve con el nombre o null. */
+    fun save(promise: Promise, suggestedName: String, content: String) {
+        val activity = rc.currentActivity
+            ?: return promise.reject("NO_ACTIVITY", "No hay actividad en primer plano")
+        pendingSave?.first?.resolve(null)
+        pendingSave = promise to content
+        val intent = Intent(Intent.ACTION_CREATE_DOCUMENT).apply {
+            addCategory(Intent.CATEGORY_OPENABLE)
+            type = "application/octet-stream"
+            putExtra(Intent.EXTRA_TITLE, suggestedName)
+        }
+        activity.startActivityForResult(intent, REQUEST_SAVE)
+    }
+
+    private fun onSaveResult(resultCode: Int, data: Intent?) {
+        val (promise, content) = pendingSave ?: return
+        pendingSave = null
+        val uri = data?.data
+        if (resultCode != Activity.RESULT_OK || uri == null) {
+            promise.resolve(null)
+            return
+        }
+        Thread {
+            try {
+                rc.contentResolver.openOutputStream(uri, "wt")?.use {
+                    it.write(content.toByteArray(Charsets.UTF_8))
+                } ?: throw IllegalStateException("No se pudo abrir el destino")
+                promise.resolve(displayName(uri))
+            } catch (e: Exception) {
+                promise.reject("SAVE_ERROR", e.message, e)
+            }
+        }.start()
+    }
+
     private val listener = object : BaseActivityEventListener() {
         override fun onActivityResult(activity: Activity, requestCode: Int, resultCode: Int, data: Intent?) {
+            if (requestCode == REQUEST_SAVE) return onSaveResult(resultCode, data)
             if (requestCode != REQUEST) return
             val promise = pending ?: return
             pending = null
@@ -127,6 +164,7 @@ class FileImport(private val rc: ReactApplicationContext) {
 
     companion object {
         private const val REQUEST = 4711
+        private const val REQUEST_SAVE = 4712
         private const val MAX_FILE = 1 shl 20 // 1 MB por fichero
         private const val MAX_TOTAL = 20L shl 20
         private const val MAX_ENTRIES = 5000

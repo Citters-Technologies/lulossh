@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { expectExternalActivity } from '../ui/appLock';
 import { Alert, ScrollView, Share, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { isPrivateKeyText } from '../import/xshell';
@@ -78,6 +79,7 @@ export function KeysScreen({
   const pickFile = async () => {
     setError(null);
     try {
+      expectExternalActivity();
       const entries = await Ssh.pickImportFiles();
       if (!entries.length) {
         return;

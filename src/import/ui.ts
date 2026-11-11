@@ -1,4 +1,5 @@
 /** Diálogos comunes a las importaciones (Xshell, JuiceSSH). */
+import { expectExternalActivity } from '../ui/appLock';
 import { Alert, PermissionsAndroid } from 'react-native';
 import { Ssh } from '../native/SshModule';
 import type { Store } from '../store/useStore';
@@ -49,7 +50,8 @@ const JUICE_PERMS = [
 /** Importa conexiones y grupos de JuiceSSH. Devuelve false si no se pudo. */
 export async function importFromJuiceSsh(store: Store): Promise<boolean> {
   try {
-    const res = await PermissionsAndroid.requestMultiple(JUICE_PERMS as any);
+    expectExternalActivity();
+      const res = await PermissionsAndroid.requestMultiple(JUICE_PERMS as any);
     if ((res as any)[JUICE_PERMS[0]] !== 'granted') {
       Alert.alert(
         'Sin permiso',

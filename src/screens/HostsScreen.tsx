@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
+import { expectExternalActivity } from '../ui/appLock';
 import {
   Alert,
   Modal,
@@ -79,6 +80,7 @@ export function HostsScreen({
 
   const importXshell = async () => {
     try {
+      expectExternalActivity();
       const entries = await Ssh.pickImportFiles();
       if (!entries.length) {
         return; // cancelado

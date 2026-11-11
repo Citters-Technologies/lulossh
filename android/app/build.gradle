@@ -83,7 +83,7 @@ android {
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
         versionCode 1
-        versionName "1.0"
+        versionName "0.1.0"
     }
     signingConfigs {
         debug {
@@ -92,15 +92,27 @@ android {
             keyAlias 'androiddebugkey'
             keyPassword 'android'
         }
+        // Clave de publicación: se lee de ~/.gradle/gradle.properties (o
+        // GRADLE_USER_HOME), nunca del repo. Sin ella se firma con la de debug.
+        if (project.hasProperty('LULOSSH_UPLOAD_STORE_FILE')) {
+            release {
+                storeFile file(LULOSSH_UPLOAD_STORE_FILE)
+                storePassword LULOSSH_UPLOAD_STORE_PASSWORD
+                keyAlias LULOSSH_UPLOAD_KEY_ALIAS
+                keyPassword LULOSSH_UPLOAD_KEY_PASSWORD
+            }
+        }
     }
     buildTypes {
         debug {
             signingConfig signingConfigs.debug
         }
         release {
-            // Caution! In production, you need to generate your own keystore file.
-            // see https://reactnative.dev/docs/signed-apk-android.
-            signingConfig signingConfigs.debug
+            // -PluloDebugSign: firmar con debug (para actualizar instalaciones
+            // de prueba que se hicieron con la clave de debug).
+            signingConfig project.hasProperty('LULOSSH_UPLOAD_STORE_FILE') && !project.hasProperty('luloDebugSign')
+                ? signingConfigs.release
+                : signingConfigs.debug
             minifyEnabled enableProguardInReleaseBuilds
             proguardFiles getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro"
         }

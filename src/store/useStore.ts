@@ -6,6 +6,13 @@ import {
   planImport,
 } from '../import/merge';
 import type { ImportResult } from '../import/xshell';
+import {
+  BACKUP_PREFS,
+  backupFileName,
+  BackupPayload,
+  buildMeta,
+  mergeById,
+} from './backup';
 import { renameFolder } from './folders';
 import { Ssh } from '../native/SshModule';
 import { Host, Identity, resolveHost, SshKey } from './models';
@@ -244,6 +251,75 @@ export function useStore(enabled = true) {
     /** Mover/renombrar una carpeta con todo su contenido. */
     renameFolder: (from: string, to: string) =>
       saveHosts(renameFolder(hostsRef.current, from, to)),
+
+    /** Exporta todo a un fichero cifrado con `password`. null si se cancela. */
+    exportBackup: async (password: string) => {
+      const meta = await buildMeta({
+        hosts: hostsRef.current,
+        identities,
+        keys,
+      });
+      return withUnlock(
+        () =>
+          Ssh.exportBackup(
+            JSON.stringify(meta),
+            keys.map(k => k.id),
+            password,
+            backupFileName(),
+          ),
+        'Exportar copia de seguridad',
+      );
+    },
+
+    /**
+     * Restaura una copia descifrada: añade claves (con sus ids), identidades,
+     * hosts y ajustes que no existan. Lo que ya hay se conserva.
+     */
+    restoreBackup: async (p: BackupPayload) => {
+      const notes: string[] = [];
+      const newKeys: SshKey[] = [];
+      const haveKeys = new Set(keys.map(k => k.id));
+      for (const k of p.meta.keys) {
+        if (haveKeys.has(k.id)) {
+          continue;
+        }
+        const s = p.secrets[k.id];
+        if (!s) {
+          notes.push(`Clave ${k.name}: no venía en la copia`);
+          continue;
+        }
+        try {
+          const info = await withUnlock(() =>
+            Ssh.importKey(k.id, s.pem, s.passphrase ?? null, k.name),
+          );
+          newKeys.push({ ...k, ...info });
+        } catch (e: any) {
+          notes.push(`Clave ${k.name}: ${e?.message ?? e}`);
+        }
+      }
+      if (newKeys.length) {
+        await saveKeys([...keys, ...newKeys]);
+      }
+      const ids = mergeById(identities, p.meta.identities);
+      if (ids.added) {
+        await saveIdentities(ids.merged);
+      }
+      const hs = mergeById(hostsRef.current, p.meta.hosts);
+      if (hs.added) {
+        await saveHosts(hs.merged);
+      }
+      for (const [name, value] of Object.entries(p.meta.prefs)) {
+        if (BACKUP_PREFS.includes(name)) {
+          await Ssh.prefSet(name, value).catch(() => {});
+        }
+      }
+      return {
+        hosts: hs.added,
+        identities: ids.added,
+        keys: newKeys.length,
+        notes,
+      };
+    },
 
     /** No se puede borrar una clave en uso por algún host o identidad. */
     deleteKey: async (id: string) => {

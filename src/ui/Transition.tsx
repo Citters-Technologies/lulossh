@@ -35,19 +35,20 @@ export function Transition({
     progress.setValue(0);
     Animated.timing(progress, {
       toValue: 1,
-      duration: direction === 'fade' ? 140 : 240,
-      easing: Easing.out(Easing.cubic),
+      duration: direction === 'fade' ? 220 : 340,
+      easing: Easing.bezier(0.2, 0.8, 0.2, 1), // desacelera suave, sin rebote
       useNativeDriver: true,
     }).start();
     // Solo al cambiar de pantalla.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [routeKey]);
 
-  const offset = dir.current === 'forward' ? 48 : dir.current === 'back' ? -48 : 0;
+  const offset = dir.current === 'forward' ? 72 : dir.current === 'back' ? -72 : 0;
+  // Empezar casi opaco: partir de transparente sobre fondo negro da "flashazo".
   const style = {
     opacity: progress.interpolate({
       inputRange: [0, 1],
-      outputRange: [dir.current === 'fade' ? 0.4 : 0.2, 1],
+      outputRange: [dir.current === 'fade' ? 0.75 : 0.85, 1],
     }),
     transform: [
       {
