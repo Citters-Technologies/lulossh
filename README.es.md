@@ -58,7 +58,7 @@ npm run android
 
 ## Licencia
 
-Copyright (C) 2026 Citters Technologies SL
+Copyright (C) 2026 Citters Technologies SLU
 
 LuloSSH se distribuye bajo la **GNU Affero General Public License v3.0**
 (ver [LICENSE](LICENSE)). Puedes usarlo, modificarlo y redistribuirlo, pero
