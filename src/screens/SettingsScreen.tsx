@@ -22,6 +22,13 @@ import {
 } from '../ui/appLock';
 import { parsePayload } from '../store/backup';
 import { Store } from '../store/useStore';
+import { ImportSection } from './ImportSection';
+import {
+  DEFAULT_THEME_ID,
+  TERM_THEME_PREF,
+  TERM_THEMES,
+  themeById,
+} from '../terminal/themes';
 import { Button, colors, Field, Header, Segmented, styles } from '../ui/kit';
 
 const REPO = 'https://github.com/Citters-Technologies/lulossh';
@@ -48,6 +55,18 @@ export function SettingsScreen({
   } | null>(null);
   const [pwError, setPwError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [themeId, setThemeId] = useState(DEFAULT_THEME_ID);
+  const [themePicker, setThemePicker] = useState(false);
+  useEffect(() => {
+    Ssh.prefGet(TERM_THEME_PREF)
+      .then(v => v && setThemeId(v))
+      .catch(() => {});
+  }, []);
+  const chooseTheme = (id: string) => {
+    setThemeId(id);
+    setThemePicker(false);
+    Ssh.prefSet(TERM_THEME_PREF, id).catch(() => {});
+  };
 
   useEffect(() => setPwError(null), [pw?.mode]);
 
@@ -191,6 +210,9 @@ export function SettingsScreen({
           )}
         </View>
 
+        <Text style={styles.section}>Importar</Text>
+        <ImportSection store={store} />
+
         <Text style={styles.section}>Copia de seguridad</Text>
         <Item
           icon="📤"
@@ -206,6 +228,12 @@ export function SettingsScreen({
         />
 
         <Text style={styles.section}>Terminal</Text>
+        <Item
+          icon="🎨"
+          title="Tema de color"
+          sub={`Colores de la consola · ${themeById(themeId).name}`}
+          onPress={() => setThemePicker(true)}
+        />
         <Item
           icon="⌨️"
           title="Botonera de teclas"
@@ -227,6 +255,59 @@ export function SettingsScreen({
           onPress={onLicenses}
         />
       </ScrollView>
+
+      <Modal
+        visible={themePicker}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setThemePicker(false)}
+      >
+        <View style={local.backdrop}>
+          <View style={[local.dialog, local.themeDialog]}>
+            <Text style={local.title}>Tema de color</Text>
+            <Text style={local.sub}>
+              Se aplica al abrir una sesión nueva.
+            </Text>
+            <ScrollView style={local.themeList}>
+              {TERM_THEMES.map(t => {
+                const on = t.id === themeId;
+                const c = t.colors;
+                return (
+                  <Pressable
+                    key={t.id}
+                    onPress={() => chooseTheme(t.id)}
+                    style={({ pressed }) => [
+                      local.themeRow,
+                      on && local.themeRowOn,
+                      pressed && local.pressed,
+                    ]}
+                  >
+                    <View
+                      style={[local.swatch, { backgroundColor: c.background }]}
+                    >
+                      <Text style={[local.swText, { color: c.green }]}>$</Text>
+                      <Text style={[local.swText, { color: c.foreground }]}>
+                        A
+                      </Text>
+                      <Text style={[local.swText, { color: c.blue }]}>n</Text>
+                      <View
+                        style={[local.swCursor, { backgroundColor: c.cursor }]}
+                      />
+                    </View>
+                    <Text style={local.themeName}>{t.name}</Text>
+                    {on && <Text style={local.themeCheck}>✓</Text>}
+                  </Pressable>
+                );
+              })}
+            </ScrollView>
+            <Button
+              title="Cerrar"
+              kind="secondary"
+              onPress={() => setThemePicker(false)}
+            />
+          </View>
+        </View>
+      </Modal>
 
       <Modal
         visible={!!pw}
@@ -335,4 +416,30 @@ const local = StyleSheet.create({
     padding: 16,
     gap: 6,
   },
+  themeDialog: { maxHeight: '80%' },
+  themeList: { marginVertical: 8 },
+  themeRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    padding: 8,
+    borderRadius: 10,
+    marginBottom: 4,
+  },
+  themeRowOn: { backgroundColor: colors.surface2 },
+  swatch: {
+    width: 56,
+    height: 34,
+    borderRadius: 8,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 2,
+    borderWidth: 1,
+    borderColor: '#0006',
+  },
+  swText: { fontSize: 14, fontWeight: '700' },
+  swCursor: { width: 7, height: 16, borderRadius: 1, marginLeft: 2 },
+  themeName: { flex: 1, color: '#fff', fontSize: 15, fontWeight: '600' },
+  themeCheck: { color: colors.accent, fontSize: 18, fontWeight: '800' },
 });

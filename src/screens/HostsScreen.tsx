@@ -1,5 +1,4 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { expectExternalActivity } from '../ui/appLock';
 import {
   Alert,
   Modal,
@@ -10,8 +9,6 @@ import {
   TextInput,
   View,
 } from 'react-native';
-import { confirmUpdates, importFromJuiceSsh, showSummary } from '../import/ui';
-import { ImportResult, parseImport } from '../import/xshell';
 import { LiveSession, Ssh } from '../native/SshModule';
 import {
   buildTree,
@@ -52,7 +49,6 @@ export function HostsScreen({
   onEdit(h?: Host): void;
 }) {
   const [q, setQ] = useState('');
-  const [busy, setBusy] = useState(false);
   const [renaming, setRenaming] = useState<{ from: string; to: string } | null>(
     null,
   );
@@ -133,131 +129,6 @@ export function HostsScreen({
         return src.every((p, i) => parts[i] === p);
       })
       .map(h => h.id);
-  };
-
-  const [juiceInstalled, setJuiceInstalled] = useState(false);
-  useEffect(() => {
-    Ssh.isJuiceSshInstalled()
-      .then(setJuiceInstalled)
-      .catch(() => {});
-  }, []);
-
-  const importJuice = async () => {
-    setBusy(true);
-    await importFromJuiceSsh(store);
-    setBusy(false);
-  };
-
-  // Importación de Xshell que espera la contraseña maestra (null = sin modal).
-  const [xMaster, setXMaster] = useState<{
-    parsed: ImportResult;
-    count: number;
-    pw: string;
-    error?: string;
-  } | null>(null);
-
-  const importXshell = async () => {
-    try {
-      expectExternalActivity();
-      const entries = await Ssh.pickImportFiles();
-      if (!entries.length) {
-        return; // cancelado
-      }
-      setBusy(true);
-      const parsed = parseImport(entries);
-      if (!parsed.hosts.length && !parsed.keys.length) {
-        Alert.alert(
-          'Nada que importar',
-          'Elige el .xts exportado desde Xshell (Archivo → Exportar), un .zip ' +
-            'de la carpeta Sessions, ficheros .xsh o claves privadas .pem.',
-        );
-        return;
-      }
-      const count = parsed.hosts.filter(h => h.encPassword).length;
-      if (count > 0) {
-        // Hay contraseñas cifradas: pedir la contraseña maestra de Xshell.
-        setXMaster({ parsed, count, pw: '' });
-        return;
-      }
-      await finishXshell(parsed);
-    } catch (e: any) {
-      Alert.alert('Error al importar', e?.message ?? String(e));
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  const finishXshell = async (parsed: ImportResult, decrypted?: number) => {
-    const r = await store.importBatch(parsed, confirmUpdates);
-    const extra: string[] = [];
-    if (decrypted !== undefined) {
-      const total = parsed.hosts.filter(h => h.encPassword).length;
-      extra.push(`🔑 ${decrypted}/${total} contraseñas descifradas.`);
-      if (decrypted < total) {
-        extra.push(
-          'Las que faltan usan otra contraseña maestra o un formato que no ' +
-            'reconocemos; complétalas a mano.',
-        );
-      }
-    }
-    if (r.incomplete) {
-      extra.push('Importa sus claves desde Claves o vuelve a importar con los .pem.');
-    }
-    showSummary('Importación de Xshell', r, extra.join('\n') || undefined);
-  };
-
-  // Descifra con la contraseña maestra y continúa la importación.
-  const runXMaster = async () => {
-    if (!xMaster) {
-      return;
-    }
-    setBusy(true);
-    try {
-      const { parsed, pw } = xMaster;
-      const withPw = parsed.hosts.filter(h => h.encPassword);
-      const plains = await Ssh.decryptXshellPasswords(
-        pw,
-        withPw.map(h => h.encPassword!),
-      );
-      let ok = 0;
-      withPw.forEach((h, i) => {
-        if (plains[i]) {
-          h.password = plains[i]!;
-          ok++;
-        }
-      });
-      if (ok === 0) {
-        setXMaster(m =>
-          m
-            ? { ...m, error: 'Contraseña maestra incorrecta (no cuadró ninguna).' }
-            : m,
-        );
-        return;
-      }
-      setXMaster(null);
-      await finishXshell(parsed, ok);
-    } catch (e: any) {
-      setXMaster(m => (m ? { ...m, error: e?.message ?? String(e) } : m));
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  // Importar sin contraseñas (deja los hosts incompletos).
-  const skipXMaster = async () => {
-    if (!xMaster) {
-      return;
-    }
-    const parsed = xMaster.parsed;
-    setXMaster(null);
-    setBusy(true);
-    try {
-      await finishXshell(parsed);
-    } catch (e: any) {
-      Alert.alert('Error al importar', e?.message ?? String(e));
-    } finally {
-      setBusy(false);
-    }
   };
 
   const filtered = useMemo(() => {
@@ -533,31 +404,10 @@ export function HostsScreen({
           </Text>
         )}
 
-        {store.loaded && (
-          <Pressable
-            onPress={importXshell}
-            disabled={busy}
-            style={({ pressed }) => [
-              local.importBtn,
-              (pressed || busy) && local.dim,
-            ]}
-          >
-            <Text style={local.importText}>
-              {busy ? 'Importando…' : '⇪  Importar de Xshell'}
-            </Text>
-          </Pressable>
-        )}
-        {store.loaded && juiceInstalled && (
-          <Pressable
-            onPress={importJuice}
-            disabled={busy}
-            style={({ pressed }) => [
-              local.importBtn,
-              (pressed || busy) && local.dim,
-            ]}
-          >
-            <Text style={local.importText}>⇪  Importar de JuiceSSH</Text>
-          </Pressable>
+        {store.loaded && store.hosts.length === 0 && (
+          <Text style={local.hint}>
+            Importa tus máquinas desde ⚙️ Ajustes → Importar (Xshell o JuiceSSH).
+          </Text>
         )}
       </ScrollView>
 
@@ -610,49 +460,6 @@ export function HostsScreen({
         onCancel={() => setBulk(null)}
         onConfirm={confirmBulkDelete}
       />
-
-      <Modal
-        visible={!!xMaster}
-        transparent
-        animationType="fade"
-        onRequestClose={() => {
-          if (!busy) {
-            setXMaster(null);
-          }
-        }}
-      >
-        <View style={local.backdrop}>
-          <View style={local.dialog}>
-            <Text style={styles.rowTitle}>Contraseña maestra de Xshell</Text>
-            <Text style={styles.rowSub}>
-              {xMaster?.count} sesiones traen la contraseña cifrada. Escribe la
-              contraseña maestra que usas en Xshell para descifrarlas. No se
-              guarda; solo se usa aquí.
-            </Text>
-            <Field
-              label="Contraseña maestra"
-              value={xMaster?.pw ?? ''}
-              onChangeText={pw =>
-                setXMaster(m => (m ? { ...m, pw, error: undefined } : m))
-              }
-              secureTextEntry
-              autoFocus
-            />
-            {xMaster?.error && <Text style={styles.error}>{xMaster.error}</Text>}
-            <Button
-              title={busy ? 'Descifrando…' : 'Descifrar e importar'}
-              disabled={busy || !xMaster?.pw}
-              onPress={runXMaster}
-            />
-            <Button
-              title="Importar sin contraseñas"
-              kind="secondary"
-              disabled={busy}
-              onPress={skipXMaster}
-            />
-          </View>
-        </View>
-      </Modal>
     </View>
   );
 }

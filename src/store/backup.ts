@@ -13,6 +13,7 @@ export const BACKUP_PREFS = [
   'collapsedGroups',
   'hostOrder',
   'terminalFontSize',
+  'terminalTheme',
   'appLock',
   'appLockAfter',
 ];

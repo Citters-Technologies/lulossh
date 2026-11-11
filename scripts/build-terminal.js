@@ -34,11 +34,12 @@ html,body{margin:0;padding:0;height:100%;background:#0b0f14;overflow:hidden}
    la clase base .xterm-cursor (siempre presente) como un bloque sólido verde de
    marca, sea cual sea su estilo, visible y sin parpadeo, para poder seguirlo al
    moverse por el prompt. */
+:root{--lulo-cursor:#9be22d;--lulo-cursor-accent:#0b0f14}
 .xterm .xterm-cursor,
 .xterm .xterm-cursor.xterm-cursor-outline,
 .xterm .xterm-cursor.xterm-cursor-bar,
 .xterm .xterm-cursor.xterm-cursor-underline{
-  background-color:#9be22d !important;color:#0b0f14 !important;
+  background-color:var(--lulo-cursor) !important;color:var(--lulo-cursor-accent) !important;
   outline:none !important;box-shadow:none !important;
   opacity:1 !important;visibility:visible !important;
 }

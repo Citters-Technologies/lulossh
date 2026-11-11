@@ -186,6 +186,19 @@
       // Esperar al re-render para medir bien las celdas nuevas.
       requestAnimationFrame(doFit);
     },
+    /** Aplica una paleta (JSON del tema): colores de xterm + cursor + fondo. */
+    setTheme: function (json) {
+      try {
+        var c = JSON.parse(json);
+        term.options.theme = c;
+        var root = document.documentElement;
+        root.style.setProperty('--lulo-cursor', c.cursor || '#9be22d');
+        root.style.setProperty('--lulo-cursor-accent', c.cursorAccent || c.background || '#0b0f14');
+        if (c.background) {
+          document.body.style.background = c.background;
+        }
+      } catch (e) {}
+    },
     focus: function () {
       if (nativeKeyboard) {
         post({ type: 'focus' }); // abrir (no alternar) el teclado

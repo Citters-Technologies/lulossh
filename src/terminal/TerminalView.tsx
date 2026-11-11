@@ -30,6 +30,8 @@ export interface TerminalHandle {
   /** Pega texto como si viniera del teclado (con bracketed paste). */
   paste(text: string): void;
   setFontSize(px: number): void;
+  /** Aplica una paleta de colores (objeto de tema de xterm). */
+  setTheme(theme: object): void;
 }
 
 interface Props {
@@ -57,6 +59,9 @@ export const TerminalView = forwardRef<TerminalHandle, Props>(
       clearSelection: () => run('window.lulo.clearSelection()'),
       paste: text => run(`window.lulo.paste("${toBase64(text)}")`),
       setFontSize: px => run(`window.lulo.setFontSize(${Number(px) || 14})`),
+      // JSON.stringify entrecomilla todo; seguro dentro de comillas simples.
+      setTheme: theme =>
+        run(`window.lulo.setTheme(${JSON.stringify(JSON.stringify(theme))})`),
     }));
 
     // Android: el teclado lo recibe una vista nativa (sin mayúsculas ni

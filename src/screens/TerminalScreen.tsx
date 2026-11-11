@@ -23,6 +23,11 @@ import { Ssh, sshEvents, toBase64 } from '../native/SshModule';
 import { Host, hostLabel } from '../store/models';
 import { newId, withUnlock } from '../store/vault';
 import { TerminalHandle, TerminalView } from '../terminal/TerminalView';
+import {
+  DEFAULT_THEME_ID,
+  TERM_THEME_PREF,
+  themeById,
+} from '../terminal/themes';
 import { useKeyboardHeight } from '../ui/useKeyboardHeight';
 
 const NO_MODS: ModifierState = { ctrl: false, alt: false, shift: false };
@@ -355,7 +360,11 @@ export function TerminalScreen({
       return; // el WebView puede recargarse; no reconectar en silencio
     }
     started.current = true;
-    // El WebView ya cargó: aplicar el tamaño guardado (puede cambiar cols/rows).
+    // El WebView ya cargó: aplicar el tema y el tamaño guardados.
+    const themeId = await Ssh.prefGet(TERM_THEME_PREF).catch(() => null);
+    if (themeId && themeId !== DEFAULT_THEME_ID) {
+      term.current?.setTheme(themeById(themeId).colors);
+    }
     if (fontSize.current !== FONT_DEFAULT) {
       term.current?.setFontSize(fontSize.current);
     }
