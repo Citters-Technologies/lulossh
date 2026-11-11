@@ -134,8 +134,9 @@ export const DEFAULT_LAYOUT: KeyboardLayout = {
     main: {
       name: 'Principal',
       // Dos filas alineadas por columnas, flechas en T invertida:
-      //   Esc  /   -   |  Home  ↑  End PgUp  IA
-      //   Tab Ctrl Alt ~   ←    ↓   →  PgDn Shift
+      //   Esc  /   -   |  Home  ↑  End ⚡su  IA
+      //   Tab Ctrl Alt ~   ←    ↓   →   ^C  Shift
+      // (PgUp/PgDn siguen disponibles en el editor de la botonera.)
       rows: [
         [
           k('esc', 'Esc', { kind: 'key', key: 'esc' }),
@@ -145,7 +146,7 @@ export const DEFAULT_LAYOUT: KeyboardLayout = {
           k('home', 'Home', { kind: 'key', key: 'home' }),
           k('up', '↑', { kind: 'key', key: 'up' }, true),
           k('end', 'End', { kind: 'key', key: 'end' }),
-          k('pgup', 'PgUp', { kind: 'key', key: 'pageUp' }, true),
+          k('su', '⚡su', { kind: 'macro', sequence: 'sudo su\r' }),
           k('ai', 'IA', { kind: 'layer', layer: 'ai' }),
         ],
         [
@@ -156,7 +157,7 @@ export const DEFAULT_LAYOUT: KeyboardLayout = {
           k('left', '←', { kind: 'key', key: 'left' }, true),
           k('down', '↓', { kind: 'key', key: 'down' }, true),
           k('right', '→', { kind: 'key', key: 'right' }, true),
-          k('pgdn', 'PgDn', { kind: 'key', key: 'pageDown' }, true),
+          k('ctrlc', '^C', { kind: 'macro', sequence: '\x03' }),
           k('shift', 'Shift', { kind: 'modifier', modifier: 'shift' }),
         ],
       ],

@@ -24,19 +24,35 @@ object JuiceImport {
     }
 
     /** {connections, groups, memberships}; lanza SecurityException si falta permiso. */
+    // Proyecciones y orden tal cual PluginContract (el provider espera columnas explícitas).
+    private val CONNECTIONS = arrayOf(
+        "id", "rowid AS _id", "modified",
+        "COALESCE(NULLIF(nickname,''), address) AS name",
+        "address", "port", "nickname", "type",
+    )
+    private val GROUPS = arrayOf("id", "rowid AS _id", "modified", "name")
+    private val MEMBERSHIPS = arrayOf("id", "rowid AS _id", "modified", "group_id", "connection_id")
+
     fun read(ctx: Context): WritableMap = Arguments.createMap().apply {
-        putArray("connections", query(ctx, "connections", listOf("id", "name", "nickname", "address", "port", "type")))
-        putArray("groups", tryQuery(ctx, "connectiongroups", listOf("id", "name")))
-        putArray("memberships", tryQuery(ctx, "connectiongroupmemberships", listOf("group_id", "connection_id")))
+        putArray("connections", query(ctx, "connections", CONNECTIONS, "name COLLATE NOCASE ASC",
+            listOf("id", "name", "nickname", "address", "port", "type")))
+        putArray("groups", tryQuery(ctx, "connectiongroups", GROUPS, "name COLLATE NOCASE ASC", listOf("id", "name")))
+        putArray("memberships", tryQuery(ctx, "connectiongroupmemberships", MEMBERSHIPS, "id ASC",
+            listOf("group_id", "connection_id")))
     }
 
     // Los grupos son opcionales: si fallan, se importan las conexiones sin carpeta.
-    private fun tryQuery(ctx: Context, path: String, cols: List<String>): WritableArray =
-        try { query(ctx, path, cols) } catch (_: SecurityException) { Arguments.createArray() }
+    private fun tryQuery(ctx: Context, path: String, proj: Array<String>, sort: String, cols: List<String>): WritableArray =
+        try {
+            query(ctx, path, proj, sort, cols)
+        } catch (e: Exception) {
+            android.util.Log.w("LuloSSH", "JuiceSSH $path: ${e.message}", e)
+            Arguments.createArray()
+        }
 
-    private fun query(ctx: Context, path: String, cols: List<String>): WritableArray {
+    private fun query(ctx: Context, path: String, proj: Array<String>, sort: String, cols: List<String>): WritableArray {
         val out = Arguments.createArray()
-        val cursor = ctx.contentResolver.query(Uri.parse("$AUTHORITY/$path"), null, null, null, null)
+        val cursor = ctx.contentResolver.query(Uri.parse("$AUTHORITY/$path"), proj, null, null, sort)
             ?: throw IllegalStateException("JuiceSSH no respondió ($path)")
         cursor.use { c ->
             while (c.moveToNext()) {

@@ -31,6 +31,7 @@ export function HostsScreen({
   onConnect,
   onEdit,
   onKeys,
+  onSettings,
 }: {
   store: Store;
   /** Sesiones abiertas en segundo plano. */
@@ -40,6 +41,7 @@ export function HostsScreen({
   onConnect(h: Host): void;
   onEdit(h?: Host): void;
   onKeys(): void;
+  onSettings(): void;
 }) {
   const [q, setQ] = useState('');
   const [busy, setBusy] = useState(false);
@@ -199,6 +201,14 @@ export function HostsScreen({
         <Text style={local.brand}>
           Lulo<Text style={local.brandAccent}>SSH</Text>
         </Text>
+        <Pressable
+          onPress={onSettings}
+          hitSlop={8}
+          style={local.headerBtn}
+          accessibilityLabel="Ajustes"
+        >
+          <Text style={local.headerBtnText}>⚙</Text>
+        </Pressable>
         <Pressable onPress={onKeys} hitSlop={8} style={local.headerBtn}>
           <Text style={local.headerBtnText}>🔑 Claves</Text>
         </Pressable>

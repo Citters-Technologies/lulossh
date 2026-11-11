@@ -178,9 +178,11 @@ class SshModule(private val rc: ReactApplicationContext) : ReactContextBaseJavaM
             try {
                 promise.resolve(JuiceImport.read(rc))
             } catch (e: SecurityException) {
-                promise.reject("NO_PERMISSION", "JuiceSSH no ha dado permiso para leer sus conexiones", e)
+                android.util.Log.e("LuloSSH", "JuiceSSH permiso", e)
+                promise.reject("NO_PERMISSION", "JuiceSSH no ha dado permiso para leer sus conexiones: ${e.message}", e)
             } catch (e: Exception) {
-                promise.reject("JUICE_ERROR", e.message, e)
+                android.util.Log.e("LuloSSH", "JuiceSSH", e)
+                promise.reject("JUICE_ERROR", "${e.javaClass.simpleName}: ${e.message}", e)
             }
         }
     }

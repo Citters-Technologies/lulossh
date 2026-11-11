@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   HostUpdate,
   hostsWaitingForKey,
@@ -18,7 +18,8 @@ const KEYS = 'keys';
  * Estado de hosts y claves, persistido cifrado en el vault.
  * (Más adelante, la sync de Drive exportará estos mismos datos cifrados.)
  */
-export function useStore() {
+/** `enabled`: no leer el vault hasta que la app esté desbloqueada. */
+export function useStore(enabled = true) {
   const [hosts, setHosts] = useState<Host[]>([]);
   const [keys, setKeys] = useState<SshKey[]>([]);
   const [loaded, setLoaded] = useState(false);
@@ -39,9 +40,13 @@ export function useStore() {
     }
   }, []);
 
+  const started = useRef(false);
   useEffect(() => {
-    load();
-  }, [load]);
+    if (enabled && !started.current) {
+      started.current = true;
+      load();
+    }
+  }, [enabled, load]);
 
   const saveHosts = async (next: Host[]) => {
     await writeJson(HOSTS, next);

@@ -6,7 +6,14 @@ import {
   PermissionsAndroid,
   Platform,
   StatusBar,
+  StyleSheet,
+  View,
 } from 'react-native';
+import { KeyBarEditorScreen } from './src/screens/KeyBarEditorScreen';
+import { LockScreen } from './src/screens/LockScreen';
+import { SettingsScreen } from './src/screens/SettingsScreen';
+import { loadLockSettings, LockSettings, shouldRelock } from './src/ui/appLock';
+import { colors } from './src/ui/kit';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { importFromJuiceSsh } from './src/import/ui';
 import { LiveSession, Ssh } from './src/native/SshModule';
@@ -20,10 +27,16 @@ import { useStore } from './src/store/useStore';
 
 const JUICE_PREF = 'juiceImport';
 
+const appStyles = StyleSheet.create({
+  blank: { flex: 1, backgroundColor: colors.bg },
+});
+
 type Route =
   | { name: 'hosts' }
   | { name: 'editHost'; host?: Host }
   | { name: 'keys'; from?: Route }
+  | { name: 'settings' }
+  | { name: 'keybar' }
   | {
       name: 'terminal';
       host: Host;
@@ -33,10 +46,41 @@ type Route =
     };
 
 export default function App() {
-  const store = useStore();
+  // Bloqueo con huella/PIN: al arrancar y al volver tras el tiempo elegido.
+  // null = leyendo ajustes; el vault no se lee hasta desbloquear.
+  const [locked, setLockedState] = useState<boolean | null>(null);
+  const store = useStore(locked === false);
   const [route, setRoute] = useState<Route>({ name: 'hosts' });
   const [live, setLive] = useState<LiveSession[]>([]);
   const home = () => setRoute({ name: 'hosts' });
+  const setLocked = (v: boolean) => {
+    if (v) {
+      // La terminal se desmonta mientras está bloqueado: al volver, restaurar
+      // la sesión (sigue viva en nativo) en lugar de reconectar.
+      setRoute(r => (r.name === 'terminal' ? { ...r, resume: true } : r));
+    }
+    setLockedState(v);
+  };
+  const lockSettings = useRef<LockSettings>({ enabled: true, afterSec: 60 });
+  const backgroundAt = useRef<number | null>(null);
+  useEffect(() => {
+    loadLockSettings().then(s => {
+      lockSettings.current = s;
+      setLocked(s.enabled);
+    });
+    const sub = AppState.addEventListener('change', st => {
+      if (st === 'background') {
+        backgroundAt.current = Date.now();
+      } else if (st === 'active' && backgroundAt.current != null) {
+        const away = Date.now() - backgroundAt.current;
+        backgroundAt.current = null;
+        if (shouldRelock(lockSettings.current, away)) {
+          setLocked(true);
+        }
+      }
+    });
+    return () => sub.remove();
+  }, []);
 
   const refreshLive = useCallback(
     () =>
@@ -155,7 +199,11 @@ export default function App() {
         return false;
       }
       setRoute(
-        route.name === 'keys' && route.from ? route.from : { name: 'hosts' },
+        route.name === 'keys' && route.from
+          ? route.from
+          : route.name === 'keybar'
+          ? { name: 'settings' }
+          : { name: 'hosts' },
       );
       return true;
     });
@@ -215,8 +263,21 @@ export default function App() {
           onConnect={connect}
           onEdit={h => setRoute({ name: 'editHost', host: h })}
           onKeys={() => setRoute({ name: 'keys' })}
+          onSettings={() => setRoute({ name: 'settings' })}
         />
       );
+      break;
+    case 'settings':
+      screen = (
+        <SettingsScreen
+          onBack={home}
+          onEditKeyBar={() => setRoute({ name: 'keybar' })}
+          onLockChange={s => (lockSettings.current = s)}
+        />
+      );
+      break;
+    case 'keybar':
+      screen = <KeyBarEditorScreen onBack={() => setRoute({ name: 'settings' })} />;
       break;
     case 'editHost':
       screen = (
@@ -256,7 +317,14 @@ export default function App() {
   return (
     <SafeAreaProvider>
       <StatusBar barStyle="light-content" />
-      {screen}
+      {/* Bloqueado: no se pinta nada de la app (las sesiones siguen en nativo). */}
+      {locked === false ? (
+        screen
+      ) : locked === true ? (
+        <LockScreen onUnlocked={() => setLocked(false)} />
+      ) : (
+        <View style={appStyles.blank} />
+      )}
     </SafeAreaProvider>
   );
 }

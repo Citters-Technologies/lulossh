@@ -80,7 +80,12 @@ export function KeyBar({ layout, mods, onToggleModifier, onSend }: Props) {
               ]}
               accessibilityLabel={btn.label}
             >
-              <Text style={[styles.label, isActive(btn) && styles.labelActive]}>
+              <Text
+                numberOfLines={1}
+                adjustsFontSizeToFit
+                minimumFontScale={0.6}
+                style={[styles.label, isActive(btn) && styles.labelActive]}
+              >
                 {btn.label}
               </Text>
             </Pressable>
@@ -105,6 +110,6 @@ const styles = StyleSheet.create({
   },
   keyActive: { backgroundColor: '#3b82f6' },
   keyPressed: { backgroundColor: '#35414f' },
-  label: { color: '#d7dde5', fontSize: 14 },
+  label: { color: '#d7dde5', fontSize: 14, paddingHorizontal: 2 },
   labelActive: { color: '#fff', fontWeight: '700' },
 });

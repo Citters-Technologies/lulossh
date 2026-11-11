@@ -10,6 +10,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { AiTool, detectCommand, parseDetect } from '../ai/tools';
+import { LAYOUT_PREF, parseLayout } from '../keyboard/catalog';
 import { KeyBar } from '../keyboard/KeyBar';
 import {
   applyCtrl,
@@ -60,6 +61,13 @@ export function TerminalScreen({
   modsRef.current = mods;
   const keyboardHeight = useKeyboardHeight();
   const [aiTools, setAiTools] = useState<AiTool[]>([]);
+  // Botonera del usuario (Ajustes → Botonera), o la de serie.
+  const [layout, setLayout] = useState(DEFAULT_LAYOUT);
+  useEffect(() => {
+    Ssh.prefGet(LAYOUT_PREF)
+      .then(v => setLayout(parseLayout(v)))
+      .catch(() => {});
+  }, []);
   const [barVisible, setBarVisible] = useState(true);
   /** null: sin selección activa; '' : pulsación larga sobre vacío (solo Pegar). */
   const [selection, setSelection] = useState<string | null>(null);
@@ -482,7 +490,8 @@ export function TerminalScreen({
         )}
         {barVisible && (
           <KeyBar
-            layout={DEFAULT_LAYOUT}
+            key={layout === DEFAULT_LAYOUT ? 'default' : 'custom'}
+            layout={layout}
             mods={mods}
             onToggleModifier={toggleModifier}
             onSend={sendFromBar}
