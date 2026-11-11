@@ -1,6 +1,8 @@
 import React, { useState } from 'react';
 import { Alert, ScrollView, Share, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { isPrivateKeyText } from '../import/xshell';
+import { Ssh } from '../native/SshModule';
 import { SshKey } from '../store/models';
 import { Store } from '../store/useStore';
 import { Button, Field, Header, Segmented, styles } from '../ui/kit';
@@ -40,6 +42,38 @@ export function KeysScreen({
       setError(e?.message ?? String(e));
     } finally {
       setBusy(false);
+    }
+  };
+
+  /** Carga la clave desde un archivo (id_ed25519, .pem, .key, .ppk…). */
+  const pickFile = async () => {
+    setError(null);
+    try {
+      const entries = await Ssh.pickImportFiles();
+      if (!entries.length) {
+        return;
+      }
+      const found = entries.filter(e => isPrivateKeyText(e.text));
+      if (!found.length) {
+        setError(
+          'No es una clave privada. Si elegiste la .pub, elige el archivo ' +
+            'sin extensión (p. ej. id_ed25519).',
+        );
+        return;
+      }
+      const f = found[0];
+      setPem(f.text);
+      if (!name.trim()) {
+        setName((f.path.split('/').pop() ?? '').replace(/\.[^.]+$/, ''));
+      }
+      if (found.length > 1) {
+        setError(
+          `Había ${found.length} claves; cargada “${f.path}”. ` +
+            'Impórtalas de una en una.',
+        );
+      }
+    } catch (e: any) {
+      setError(e?.message ?? String(e));
     }
   };
 
@@ -139,9 +173,15 @@ export function KeysScreen({
 
         {mode === 'import' && (
           <>
+            <Button
+              title="Elegir archivo…"
+              kind="secondary"
+              disabled={busy}
+              onPress={pickFile}
+            />
             <Field label="Nombre" value={name} onChangeText={setName} />
             <Field
-              label="Clave privada (OpenSSH o PEM)"
+              label="Clave privada (OpenSSH, PEM o PuTTY .ppk)"
               value={pem}
               onChangeText={setPem}
               multiline
@@ -155,7 +195,7 @@ export function KeysScreen({
             />
             <Button
               title="Importar"
-              disabled={busy || !name.trim() || !pem.includes('PRIVATE KEY')}
+              disabled={busy || !name.trim() || !isPrivateKeyText(pem)}
               onPress={() =>
                 run(() => store.importKey(name.trim(), pem, passphrase))
               }

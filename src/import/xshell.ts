@@ -103,7 +103,11 @@ export function parseXsh(path: string, text: string): ImportedHost | string {
   };
 }
 
-const PRIVATE_KEY = /-----BEGIN [A-Z0-9 ]*PRIVATE KEY-----/;
+const PRIVATE_KEY =
+  /-----BEGIN [A-Z0-9 ]*PRIVATE KEY-----|^PuTTY-User-Key-File-\d+:/m;
+
+/** Texto de una clave privada OpenSSH, PEM o PuTTY (.ppk). */
+export const isPrivateKeyText = (text: string) => PRIVATE_KEY.test(text);
 
 export function parseImport(entries: ImportEntry[]): ImportResult {
   const result: ImportResult = { hosts: [], keys: [], skipped: [] };

@@ -1,11 +1,20 @@
-import React, { useMemo, useState } from 'react';
-import { Alert, Pressable, ScrollView, Text, View } from 'react-native';
+import React, { useEffect, useMemo, useState } from 'react';
+import {
+  Alert,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
+} from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { parseImport } from '../import/xshell';
 import { Ssh } from '../native/SshModule';
 import { Host, hostLabel } from '../store/models';
 import { Store } from '../store/useStore';
 import { Button, Field, Header, styles } from '../ui/kit';
+
+const COLLAPSED_PREF = 'collapsedGroups';
 
 export function HostsScreen({
   store,
@@ -20,6 +29,25 @@ export function HostsScreen({
 }) {
   const [q, setQ] = useState('');
   const [busy, setBusy] = useState(false);
+
+  // Grupos plegados, recordados entre sesiones (no es dato sensible).
+  const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
+  useEffect(() => {
+    Ssh.prefGet(COLLAPSED_PREF)
+      .then(v => v && setCollapsed(new Set(JSON.parse(v))))
+      .catch(() => {});
+  }, []);
+  const toggleGroup = (g: string) =>
+    setCollapsed(prev => {
+      const next = new Set(prev);
+      if (!next.delete(g)) {
+        next.add(g);
+      }
+      Ssh.prefSet(COLLAPSED_PREF, JSON.stringify([...next])).catch(() => {});
+      return next;
+    });
+  // Al buscar se muestra todo, para no esconder resultados.
+  const isCollapsed = (g: string) => !q.trim() && collapsed.has(g);
 
   const importXshell = async () => {
     try {
@@ -103,8 +131,25 @@ export function HostsScreen({
         )}
         {groups.map(([group, hosts]) => (
           <View key={group}>
-            {groups.length > 1 && <Text style={styles.section}>{group}</Text>}
-            {hosts.map(h => (
+            {groups.length > 1 && (
+              <Pressable
+                onPress={() => toggleGroup(group)}
+                hitSlop={6}
+                style={local.sectionRow}
+              >
+                <Text style={[styles.section, local.chevron]}>
+                  {isCollapsed(group) ? '▸' : '▾'}
+                </Text>
+                <Text style={[styles.section, local.sectionTitle]}>
+                  {group}
+                </Text>
+                <Text style={[styles.section, local.count]}>
+                  {hosts.length}
+                </Text>
+              </Pressable>
+            )}
+            {!(groups.length > 1 && isCollapsed(group)) &&
+              hosts.map(h => (
               <Pressable
                 key={h.id}
                 onPress={() => onConnect(h)}
@@ -140,3 +185,10 @@ export function HostsScreen({
     </SafeAreaView>
   );
 }
+
+const local = StyleSheet.create({
+  sectionRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  chevron: { width: 14 },
+  sectionTitle: { flex: 1 },
+  count: { opacity: 0.6 },
+});
