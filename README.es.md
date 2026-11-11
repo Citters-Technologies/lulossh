@@ -1,13 +1,17 @@
-# LuloSSH
+<p align="center">
+  <img src="assets/logo/lulossh-icon.png" alt="Logo de LuloSSH" width="128" height="128">
+</p>
 
-[English](README.md) · **Español**
+<h1 align="center">LuloSSH</h1>
+
+<p align="center"><a href="README.md">English</a> · <strong>Español</strong></p>
 
 Cliente SSH para Android (y más adelante iOS), pensado para trabajar en consola
 desde el móvil: claves guardadas de forma segura, sincronización cifrada entre
 dispositivos y una barra de teclas propia, con una capa para CLIs de IA
 (Claude Code y similares).
 
-> Estado: en desarrollo temprano. Aún no hay versión usable.
+> Estado: alfa temprana. Se usa a diario en Android; aún sin versión publicada.
 
 ## Por qué existe LuloSSH
 

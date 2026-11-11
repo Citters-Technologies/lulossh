@@ -5,7 +5,7 @@ import React, {
   useRef,
 } from 'react';
 import { Platform } from 'react-native';
-import { Ssh, sshEvents } from '../native/SshModule';
+import { Ssh, sshEvents, toBase64 } from '../native/SshModule';
 import WebViewBase, {
   WebViewMessageEvent,
   WebViewProps,
@@ -26,6 +26,9 @@ export interface TerminalHandle {
   write(base64: string): void;
   focus(): void;
   clear(): void;
+  clearSelection(): void;
+  /** Pega texto como si viniera del teclado (con bracketed paste). */
+  paste(text: string): void;
   setFontSize(px: number): void;
 }
 
@@ -34,10 +37,14 @@ interface Props {
   onResize(size: { cols: number; rows: number }): void;
   /** Texto escrito con el teclado del sistema. */
   onInput(data: string): void;
+  /** Toque corto en la terminal (Android: alternar teclado y botonera). */
+  onTap?(): void;
+  /** Texto seleccionado con pulsación larga; null si se descarta. */
+  onSelection?(text: string | null): void;
 }
 
 export const TerminalView = forwardRef<TerminalHandle, Props>(
-  ({ onReady, onResize, onInput }, ref) => {
+  ({ onReady, onResize, onInput, onTap, onSelection }, ref) => {
     const web = useRef<WebViewRef>(null);
 
     const run = (js: string) => web.current?.injectJavaScript(`${js};true;`);
@@ -47,6 +54,8 @@ export const TerminalView = forwardRef<TerminalHandle, Props>(
       write: b64 => run(`window.lulo.write("${b64}")`),
       focus: () => run('window.lulo.focus()'),
       clear: () => run('window.lulo.clear()'),
+      clearSelection: () => run('window.lulo.clearSelection()'),
+      paste: text => run(`window.lulo.paste("${toBase64(text)}")`),
       setFontSize: px => run(`window.lulo.setFontSize(${Number(px) || 14})`),
     }));
 
@@ -75,7 +84,13 @@ export const TerminalView = forwardRef<TerminalHandle, Props>(
         return;
       }
       if (msg.type === 'tap') {
+        onTap?.();
+      } else if (msg.type === 'focus') {
         Ssh.showKeyboard();
+      } else if (msg.type === 'selection') {
+        onSelection?.(msg.text ?? '');
+      } else if (msg.type === 'selectionCleared') {
+        onSelection?.(null);
       } else if (msg.type === 'ready') {
         if (NATIVE_KEYBOARD) {
           run('window.lulo.useNativeKeyboard()');

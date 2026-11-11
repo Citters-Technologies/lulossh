@@ -37,13 +37,120 @@
   // mayúsculas en ningún IME). El textarea de xterm no debe abrir teclado.
   var nativeKeyboard = false;
 
-  // Toque en la terminal: pedir teclado a RN (o enfocar xterm si no hay nativo).
-  document.getElementById('term').addEventListener('click', function () {
+  // ---- Gestos táctiles -------------------------------------------------
+  //  - toque corto: RN muestra/oculta teclado y botonera (o enfoca xterm)
+  //  - pulsación larga: selecciona la palabra; arrastrar amplía la selección
+  //  - al soltar tras seleccionar: RN muestra Copiar / Pegar
+  var el = document.getElementById('term');
+  var LONG_MS = 450;
+  var MOVE_PX = 10;
+  var touch = null; // {x, y, moved, timer, selecting, anchor}
+
+  function cellAt(x, y) {
+    var screen = term.element.querySelector('.xterm-screen');
+    var r = screen.getBoundingClientRect();
+    var cw = r.width / term.cols;
+    var ch = r.height / term.rows;
+    var col = Math.min(term.cols - 1, Math.max(0, Math.floor((x - r.left) / cw)));
+    var row = Math.min(term.rows - 1, Math.max(0, Math.floor((y - r.top) / ch)));
+    return { col: col, row: row + term.buffer.active.viewportY };
+  }
+
+  function lineText(row) {
+    var line = term.buffer.active.getLine(row);
+    return line ? line.translateToString(false) : '';
+  }
+
+  function selectRange(a, b) {
+    var s = a, e = b;
+    if (b.row < a.row || (b.row === a.row && b.col < a.col)) {
+      s = b;
+      e = a;
+    }
+    var len = (e.row - s.row) * term.cols + (e.col - s.col) + 1;
+    term.select(s.col, s.row, len);
+  }
+
+  /** Palabra bajo el dedo (caracteres no blancos); devuelve sus extremos. */
+  function wordAt(c) {
+    var text = lineText(c.row);
+    var isWord = function (ch) {
+      return ch && !/\s/.test(ch);
+    };
+    if (!isWord(text[c.col])) {
+      return { start: c, end: c };
+    }
+    var s = c.col, e = c.col;
+    while (s > 0 && isWord(text[s - 1])) s--;
+    while (e < text.length - 1 && isWord(text[e + 1])) e++;
+    return { start: { col: s, row: c.row }, end: { col: e, row: c.row } };
+  }
+
+  el.addEventListener(
+    'touchstart',
+    function (ev) {
+      if (ev.touches.length !== 1) {
+        touch = null;
+        return;
+      }
+      var t = ev.touches[0];
+      touch = { x: t.clientX, y: t.clientY, moved: false, selecting: false };
+      touch.timer = setTimeout(function () {
+        if (!touch || touch.moved) return;
+        touch.selecting = true;
+        var w = wordAt(cellAt(touch.x, touch.y));
+        touch.anchor = w.start;
+        selectRange(w.start, w.end);
+        if (navigator.vibrate) navigator.vibrate(15);
+      }, LONG_MS);
+    },
+    { passive: true },
+  );
+
+  el.addEventListener(
+    'touchmove',
+    function (ev) {
+      if (!touch) return;
+      var t = ev.touches[0];
+      if (touch.selecting) {
+        ev.preventDefault(); // no desplazar mientras se selecciona
+        selectRange(touch.anchor, cellAt(t.clientX, t.clientY));
+        return;
+      }
+      if (Math.abs(t.clientX - touch.x) > MOVE_PX || Math.abs(t.clientY - touch.y) > MOVE_PX) {
+        touch.moved = true; // es un desplazamiento, no un toque
+        clearTimeout(touch.timer);
+      }
+    },
+    { passive: false },
+  );
+
+  el.addEventListener('touchend', function (ev) {
+    if (!touch) return;
+    clearTimeout(touch.timer);
+    var t = touch;
+    touch = null;
+    if (t.selecting) {
+      ev.preventDefault();
+      post({ type: 'selection', text: term.getSelection() });
+      return;
+    }
+    if (t.moved) return;
+    if (term.hasSelection()) {
+      term.clearSelection(); // un toque fuera descarta la selección
+      post({ type: 'selectionCleared' });
+      return;
+    }
     if (nativeKeyboard) {
       post({ type: 'tap' });
     } else {
       term.focus();
     }
+  });
+
+  el.addEventListener('touchcancel', function () {
+    if (touch) clearTimeout(touch.timer);
+    touch = null;
   });
 
   function doFit() {
@@ -73,7 +180,7 @@
     },
     focus: function () {
       if (nativeKeyboard) {
-        post({ type: 'tap' });
+        post({ type: 'focus' }); // abrir (no alternar) el teclado
       } else {
         term.focus();
       }
@@ -87,6 +194,16 @@
     },
     clear: function () {
       term.clear();
+    },
+    clearSelection: function () {
+      term.clearSelection();
+    },
+    /** Pegar texto UTF-8 (base64): xterm aplica bracketed paste si la app lo pide. */
+    paste: function (b64) {
+      var bin = atob(b64);
+      var bytes = new Uint8Array(bin.length);
+      for (var i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+      term.paste(new TextDecoder().decode(bytes));
     },
   };
 

@@ -1,13 +1,17 @@
-# LuloSSH
+<p align="center">
+  <img src="assets/logo/lulossh-icon.png" alt="LuloSSH logo" width="128" height="128">
+</p>
 
-**English** · [Español](README.es.md)
+<h1 align="center">LuloSSH</h1>
+
+<p align="center"><strong>English</strong> · <a href="README.es.md">Español</a></p>
 
 An SSH client for Android (iOS later), built for real terminal work from your
 phone: securely stored keys, end-to-end encrypted sync across devices, and a
 custom terminal key bar with a dedicated layer for AI coding CLIs
 (Claude Code and similar).
 
-> Status: early development. Not usable yet.
+> Status: early alpha. Works daily on Android; no published release yet.
 
 ## Why LuloSSH exists
 

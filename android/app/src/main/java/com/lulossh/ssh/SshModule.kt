@@ -81,6 +81,29 @@ class SshModule(private val rc: ReactApplicationContext) : ReactContextBaseJavaM
         promise.resolve(null)
     }
 
+    private val clipboard by lazy {
+        rc.getSystemService(android.content.Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
+    }
+
+    @ReactMethod
+    fun copyText(text: String) {
+        rc.runOnUiQueueThread {
+            clipboard.setPrimaryClip(android.content.ClipData.newPlainText("LuloSSH", text))
+        }
+    }
+
+    @ReactMethod
+    fun pasteText(promise: Promise) {
+        rc.runOnUiQueueThread {
+            try {
+                val item = clipboard.primaryClip?.takeIf { it.itemCount > 0 }?.getItemAt(0)
+                promise.resolve(item?.coerceToText(rc)?.toString())
+            } catch (e: Exception) {
+                promise.reject("CLIPBOARD_ERROR", e.message, e)
+            }
+        }
+    }
+
     private val fileImport by lazy { FileImport(rc) }
 
     /** Selector de ficheros para importar; resuelve con [{path, text}] ([] si se cancela). */

@@ -44,6 +44,51 @@ export function TerminalScreen({
   modsRef.current = mods;
   const keyboardHeight = useKeyboardHeight();
   const [aiTools, setAiTools] = useState<AiTool[]>([]);
+  const [barVisible, setBarVisible] = useState(true);
+  /** null: sin selección activa; '' : pulsación larga sobre vacío (solo Pegar). */
+  const [selection, setSelection] = useState<string | null>(null);
+
+  // Toque en la consola: con teclado abierto, ocultar teclado y botonera;
+  // si no, mostrar ambos.
+  const onTap = () => {
+    if (keyboardHeight > 0) {
+      Ssh.hideKeyboard(false);
+      setBarVisible(false);
+    } else {
+      setBarVisible(true);
+      Ssh.showKeyboard();
+    }
+  };
+
+  const copySelection = () => {
+    if (selection) {
+      Ssh.copyText(selection);
+    }
+    term.current?.clearSelection();
+    setSelection(null);
+  };
+
+  const paste = async () => {
+    term.current?.clearSelection();
+    setSelection(null);
+    const text = await Ssh.pasteText().catch(() => null);
+    if (!text) {
+      return;
+    }
+    const lines = text.split(/\r?\n/).length;
+    if (lines > 1) {
+      Alert.alert(
+        'Pegar varias líneas',
+        `Vas a pegar ${lines} líneas; cada salto de línea puede ejecutar un comando.`,
+        [
+          { text: 'Cancelar', style: 'cancel' },
+          { text: 'Pegar', onPress: () => term.current?.paste(text) },
+        ],
+      );
+    } else {
+      term.current?.paste(text);
+    }
+  };
 
   // Tamaño de letra: teclas de volumen, persistido entre sesiones.
   const fontSize = useRef(FONT_DEFAULT);
@@ -264,7 +309,30 @@ export function TerminalScreen({
           onReady={onReady}
           onResize={onResize}
           onInput={onInput}
+          onTap={onTap}
+          onSelection={setSelection}
         />
+        {selection !== null && (
+          <View style={styles.selBar}>
+            {selection !== '' && (
+              <Pressable onPress={copySelection} style={styles.selBtn}>
+                <Text style={styles.selText}>Copiar</Text>
+              </Pressable>
+            )}
+            <Pressable onPress={paste} style={styles.selBtn}>
+              <Text style={styles.selText}>Pegar</Text>
+            </Pressable>
+            <Pressable
+              onPress={() => {
+                term.current?.clearSelection();
+                setSelection(null);
+              }}
+              style={styles.selBtn}
+            >
+              <Text style={styles.selText}>✕</Text>
+            </Pressable>
+          </View>
+        )}
         {aiTools.length > 0 && (
           <View style={styles.aiBar} pointerEvents="box-none">
             {aiTools.map(t => (
@@ -294,12 +362,14 @@ export function TerminalScreen({
             <Text style={styles.hintText}>{fontHint}</Text>
           </View>
         )}
-        <KeyBar
-          layout={DEFAULT_LAYOUT}
-          mods={mods}
-          onToggleModifier={toggleModifier}
-          onSend={sendFromBar}
-        />
+        {barVisible && (
+          <KeyBar
+            layout={DEFAULT_LAYOUT}
+            mods={mods}
+            onToggleModifier={toggleModifier}
+            onSend={sendFromBar}
+          />
+        )}
       </View>
     </SafeAreaView>
   );
@@ -354,5 +424,17 @@ const styles = StyleSheet.create({
     opacity: 0.45,
   },
   aiBtnPressed: { opacity: 1 },
+  selBar: {
+    position: 'absolute',
+    top: 8,
+    alignSelf: 'center',
+    flexDirection: 'row',
+    backgroundColor: '#242d38',
+    borderRadius: 10,
+    overflow: 'hidden',
+    elevation: 6,
+  },
+  selBtn: { paddingHorizontal: 16, paddingVertical: 10 },
+  selText: { color: '#fff', fontWeight: '600' },
   aiGlyph: { fontSize: 18, fontWeight: '700' },
 });

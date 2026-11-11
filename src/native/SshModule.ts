@@ -92,6 +92,10 @@ export interface SshModuleSpec {
    * las carpetas. Resuelve con [] si el usuario cancela.
    */
   pickImportFiles(): Promise<ImportEntry[]>;
+
+  /** Portapapeles del sistema. */
+  copyText(text: string): void;
+  pasteText(): Promise<string | null>;
 }
 
 export interface ImportEntry {
