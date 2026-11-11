@@ -114,9 +114,27 @@ export interface SshModuleSpec {
    */
   pickImportFiles(): Promise<ImportEntry[]>;
 
+  /** JuiceSSH: ¿instalado? y lectura por su API de plugins. */
+  isJuiceSshInstalled(): Promise<boolean>;
+  readJuiceSsh(): Promise<JuiceData>;
+
   /** Portapapeles del sistema. */
   copyText(text: string): void;
   pasteText(): Promise<string | null>;
+}
+
+/** Filas tal cual las devuelve el ContentProvider de JuiceSSH (todo string). */
+export interface JuiceData {
+  connections: {
+    id?: string;
+    name?: string;
+    nickname?: string;
+    address?: string;
+    port?: string;
+    type?: string;
+  }[];
+  groups: { id?: string; name?: string }[];
+  memberships: { group_id?: string; connection_id?: string }[];
 }
 
 export interface ImportEntry {

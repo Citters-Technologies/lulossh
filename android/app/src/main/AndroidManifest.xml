@@ -6,6 +6,15 @@
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <uses-permission android:name="android.permission.WAKE_LOCK" />
+    <!-- Importar desde JuiceSSH (API de plugins: solo conexiones y grupos) -->
+    <uses-permission android:name="com.sonelli.juicessh.api.v1.permission.READ_CONNECTIONS" />
+    <uses-permission android:name="com.sonelli.juicessh.api.v1.permission.READ_CONNECTION_GROUPS" />
+
+    <!-- Android 11+: poder ver si JuiceSSH está instalado y hablar con su provider -->
+    <queries>
+        <package android:name="com.sonelli.juicessh" />
+        <provider android:authorities="com.sonelli.juicessh.api.v1" />
+    </queries>
 
     <application
       android:name=".MainApplication"

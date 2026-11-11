@@ -11,6 +11,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { isIncomplete } from '../import/merge';
+import { confirmUpdates, importFromJuiceSsh, showSummary } from '../import/ui';
 import { parseImport } from '../import/xshell';
 import { LiveSession, Ssh } from '../native/SshModule';
 import { buildTree, FolderNode, normPath, splitPath } from '../store/folders';
@@ -66,25 +67,18 @@ export function HostsScreen({
   // Al buscar se despliega todo, para no esconder resultados.
   const isCollapsed = (path: string) => !searching && collapsed.has(path);
 
-  const confirmUpdates = (
-    updates: { name: string; changes: string[] }[],
-  ): Promise<boolean> =>
-    new Promise(resolve => {
-      const list = updates
-        .slice(0, 10)
-        .map(u => `• ${u.name}: ${u.changes.join(', ')}`)
-        .join('\n');
-      const more = updates.length > 10 ? `\n… y ${updates.length - 10} más` : '';
-      Alert.alert(
-        'Completar hosts existentes',
-        `${updates.length} hosts que ya tenías están incompletos y la importación trae lo que les falta:\n\n${list}${more}\n\n¿Actualizarlos?`,
-        [
-          { text: 'No', style: 'cancel', onPress: () => resolve(false) },
-          { text: 'Actualizar', onPress: () => resolve(true) },
-        ],
-        { cancelable: false },
-      );
-    });
+  const [juiceInstalled, setJuiceInstalled] = useState(false);
+  useEffect(() => {
+    Ssh.isJuiceSshInstalled()
+      .then(setJuiceInstalled)
+      .catch(() => {});
+  }, []);
+
+  const importJuice = async () => {
+    setBusy(true);
+    await importFromJuiceSsh(store);
+    setBusy(false);
+  };
 
   const importXshell = async () => {
     try {
@@ -103,17 +97,13 @@ export function HostsScreen({
         return;
       }
       const r = await store.importBatch(parsed, confirmUpdates);
-      const lines = [
-        `${r.hosts} hosts nuevos, ${r.keys} claves nuevas.`,
-        r.updated ? `${r.updated} hosts completados.` : '',
-        r.duplicates ? `${r.duplicates} hosts ya existían.` : '',
+      showSummary(
+        'Importación de Xshell',
+        r,
         r.incomplete
-          ? `${r.incomplete} hosts siguen sin usuario o credenciales (⚠): al tocarlos se abre el editor. Importa sus claves desde Claves o vuelve a importar con los .pem.`
-          : '',
-        ...r.notes.slice(0, 12),
-        r.notes.length > 12 ? `… y ${r.notes.length - 12} avisos más` : '',
-      ].filter(Boolean);
-      Alert.alert('Importación de Xshell', lines.join('\n'));
+          ? 'Importa sus claves desde Claves o vuelve a importar con los .pem.'
+          : undefined,
+      );
     } catch (e: any) {
       Alert.alert('Error al importar', e?.message ?? String(e));
     } finally {
@@ -347,6 +337,18 @@ export function HostsScreen({
             <Text style={local.importText}>
               {busy ? 'Importando…' : '⇪  Importar de Xshell'}
             </Text>
+          </Pressable>
+        )}
+        {store.loaded && juiceInstalled && (
+          <Pressable
+            onPress={importJuice}
+            disabled={busy}
+            style={({ pressed }) => [
+              local.importBtn,
+              (pressed || busy) && local.dim,
+            ]}
+          >
+            <Text style={local.importText}>⇪  Importar de JuiceSSH</Text>
           </Pressable>
         )}
       </ScrollView>

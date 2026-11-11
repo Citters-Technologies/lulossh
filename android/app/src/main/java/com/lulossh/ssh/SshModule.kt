@@ -168,6 +168,23 @@ class SshModule(private val rc: ReactApplicationContext) : ReactContextBaseJavaM
         }
     }
 
+    @ReactMethod
+    fun isJuiceSshInstalled(promise: Promise) = promise.resolve(JuiceImport.isInstalled(rc))
+
+    /** Conexiones y grupos de JuiceSSH (requiere sus permisos READ_*). */
+    @ReactMethod
+    fun readJuiceSsh(promise: Promise) {
+        pool.execute {
+            try {
+                promise.resolve(JuiceImport.read(rc))
+            } catch (e: SecurityException) {
+                promise.reject("NO_PERMISSION", "JuiceSSH no ha dado permiso para leer sus conexiones", e)
+            } catch (e: Exception) {
+                promise.reject("JUICE_ERROR", e.message, e)
+            }
+        }
+    }
+
     private val fileImport by lazy { FileImport(rc) }
 
     /** Selector de ficheros para importar; resuelve con [{path, text}] ([] si se cancela). */

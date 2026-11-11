@@ -64,13 +64,13 @@ export function TerminalScreen({
   /** null: sin selección activa; '' : pulsación larga sobre vacío (solo Pegar). */
   const [selection, setSelection] = useState<string | null>(null);
 
-  // Toque en la consola: con teclado abierto, ocultar teclado y botonera;
-  // si no, mostrar ambos.
+  // Toque en la consola: con el teclado abierto, mostrar/ocultar solo la
+  // botonera de teclas; con el teclado cerrado, abrir teclado y botonera.
+  // (El teclado se cierra con el gesto/botón atrás de Android.)
   const onTap = () => {
     // keyboardHeight puede quedar desfasado tras apagar la pantalla.
     if (keyboardHeight > 0 && Keyboard.isVisible()) {
-      Ssh.hideKeyboard(false);
-      setBarVisible(false);
+      setBarVisible(v => !v);
     } else {
       setBarVisible(true);
       Ssh.showKeyboard();

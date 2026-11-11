@@ -55,12 +55,14 @@ export function planImport(
     }
     const group = normPath(h.group);
 
-    // Mismo destino y (mismo usuario, o mismo nombre si allí falta el usuario).
+    // Mismo destino y (mismo usuario, o mismo nombre si a uno le falta el
+    // usuario, o cualquiera si la importación no trae usuario, p. ej. JuiceSSH).
     const match = existing.find(
       e =>
         !claimed.has(e.id) &&
         target(e) === target(h) &&
         (e.username.toLowerCase() === h.username.toLowerCase() ||
+          !h.username ||
           (!e.username && e.name.toLowerCase() === h.name.toLowerCase())),
     );
 

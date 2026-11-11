@@ -8,6 +8,7 @@ import {
   StatusBar,
 } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
+import { importFromJuiceSsh } from './src/import/ui';
 import { LiveSession, Ssh } from './src/native/SshModule';
 import { HostEditScreen } from './src/screens/HostEditScreen';
 import { HostsScreen } from './src/screens/HostsScreen';
@@ -16,6 +17,8 @@ import { TerminalScreen } from './src/screens/TerminalScreen';
 import { Host, validateHost } from './src/store/models';
 import { newId } from './src/store/vault';
 import { useStore } from './src/store/useStore';
+
+const JUICE_PREF = 'juiceImport';
 
 type Route =
   | { name: 'hosts' }
@@ -47,6 +50,8 @@ export default function App() {
   hostsRef.current = store.hosts;
   const routeRef = useRef(route);
   routeRef.current = route;
+  const storeRef = useRef(store);
+  storeRef.current = store;
 
   const openLive = useCallback((s: LiveSession) => {
     // El host puede haberse borrado: mostrar al menos el título.
@@ -94,6 +99,44 @@ export default function App() {
       refreshLive();
     }
   }, [route, refreshLive]);
+
+  // Al abrir: si JuiceSSH está instalado, ofrecer importar (hasta que se haga
+  // o el usuario diga que no vuelva a preguntar).
+  const juiceAsked = useRef(false);
+  useEffect(() => {
+    if (!store.loaded || juiceAsked.current) {
+      return;
+    }
+    juiceAsked.current = true;
+    (async () => {
+      const done = await Ssh.prefGet(JUICE_PREF).catch(() => null);
+      const installed = await Ssh.isJuiceSshInstalled().catch(() => false);
+      if (done || !installed) {
+        return;
+      }
+      Alert.alert(
+        'JuiceSSH detectado',
+        '¿Quieres importar tus conexiones y grupos de JuiceSSH? ' +
+          '(Sus usuarios y claves no se pueden leer; se completan después.)',
+        [
+          {
+            text: 'No volver a preguntar',
+            style: 'destructive',
+            onPress: () => Ssh.prefSet(JUICE_PREF, 'never').catch(() => {}),
+          },
+          { text: 'Ahora no', style: 'cancel' },
+          {
+            text: 'Importar',
+            onPress: async () => {
+              if (await importFromJuiceSsh(storeRef.current)) {
+                Ssh.prefSet(JUICE_PREF, 'imported').catch(() => {});
+              }
+            },
+          },
+        ],
+      );
+    })();
+  }, [store.loaded]);
 
   // Android 13+: permiso para la notificación de sesiones en segundo plano.
   useEffect(() => {
