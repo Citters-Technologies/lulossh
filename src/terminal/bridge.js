@@ -67,6 +67,7 @@
   term.onRender(drawCursor);
   term.onCursorMove(drawCursor);
   term.onResize(drawCursor);
+  term.onScroll(drawCursor);
 
   // xterm recibe el teclado por un <textarea> oculto. Sin esto, el teclado de
   // Android lo trata como texto normal: mayúscula inicial, autocorrección y
@@ -90,7 +91,83 @@
   var el = document.getElementById('term');
   var LONG_MS = 450;
   var MOVE_PX = 10;
-  var touch = null; // {x, y, moved, timer, selecting, anchor}
+  var touch = null; // {x, y, moved, timer, selecting, anchor, lastY, samples}
+
+  // ---- Desplazamiento con el dedo -----------------------------------------
+  // xterm no desplaza bien con gestos táctiles, así que lo hacemos nosotros:
+  //  - buffer normal (shell, Claude Code): se mueve por el historial
+  //  - pantalla alternativa (Devin, vim, less, htop…): como la rueda de un
+  //    ratón en un terminal de escritorio → eventos de rueda si la app los
+  //    pide, o flechas arriba/abajo si no.
+  var scrollAcc = 0; // fracción de línea acumulada
+  var fling = null; // id de requestAnimationFrame de la inercia
+
+  function cellHeight() {
+    var sc = term.element.querySelector('.xterm-screen');
+    return sc ? sc.getBoundingClientRect().height / term.rows : 16;
+  }
+
+  /** lines > 0 = hacia abajo (lo más nuevo); < 0 = hacia arriba. */
+  function scrollLines(lines) {
+    if (!lines) return;
+    var buf = term.buffer.active;
+    if (buf.type === 'normal') {
+      term.scrollLines(lines);
+      return;
+    }
+    var seq;
+    var mode = term.modes.mouseTrackingMode;
+    if (mode && mode !== 'none') {
+      var btn = lines > 0 ? 65 : 64;
+      var c = Math.floor(term.cols / 2) + 1;
+      var r = Math.floor(term.rows / 2) + 1;
+      var enc = 'SGR';
+      try {
+        enc = term._core.coreMouseService.activeEncoding;
+      } catch (e) {}
+      seq =
+        enc === 'DEFAULT'
+          ? '\x1b[M' + String.fromCharCode(32 + btn, 32 + c, 32 + r)
+          : '\x1b[<' + btn + ';' + c + ';' + r + 'M';
+    } else {
+      var app = term.modes.applicationCursorKeysMode;
+      seq = lines > 0 ? (app ? '\x1bOB' : '\x1b[B') : app ? '\x1bOA' : '\x1b[A';
+    }
+    var out = '';
+    for (var i = 0; i < Math.min(Math.abs(lines), 20); i++) out += seq;
+    post({ type: 'input', data: out });
+  }
+
+  /** Desplaza según píxeles de dedo (dy > 0 = dedo hacia arriba). */
+  function scrollPx(dy) {
+    scrollAcc += dy / cellHeight();
+    var n = scrollAcc > 0 ? Math.floor(scrollAcc) : Math.ceil(scrollAcc);
+    scrollAcc -= n;
+    scrollLines(n);
+  }
+
+  function stopFling() {
+    if (fling) cancelAnimationFrame(fling);
+    fling = null;
+  }
+
+  /** Inercia tras soltar: v en px/ms, se frena poco a poco. */
+  function startFling(v) {
+    stopFling();
+    var last = performance.now();
+    var step = function (now) {
+      var dt = Math.min(now - last, 50);
+      last = now;
+      scrollPx(v * dt);
+      v *= Math.pow(0.995, dt);
+      if (Math.abs(v) > 0.05) {
+        fling = requestAnimationFrame(step);
+      } else {
+        fling = null;
+      }
+    };
+    fling = requestAnimationFrame(step);
+  }
 
   function cellAt(x, y) {
     var screen = term.element.querySelector('.xterm-screen');
@@ -139,8 +216,18 @@
         touch = null;
         return;
       }
+      stopFling();
       var t = ev.touches[0];
-      touch = { x: t.clientX, y: t.clientY, moved: false, selecting: false };
+      touch = {
+        x: t.clientX,
+        y: t.clientY,
+        lastY: t.clientY,
+        samples: [],
+        moved: false,
+        vertical: false,
+        selecting: false,
+      };
+      scrollAcc = 0;
       touch.timer = setTimeout(function () {
         if (!touch || touch.moved) return;
         touch.selecting = true;
@@ -163,9 +250,24 @@
         selectRange(touch.anchor, cellAt(t.clientX, t.clientY));
         return;
       }
-      if (Math.abs(t.clientX - touch.x) > MOVE_PX || Math.abs(t.clientY - touch.y) > MOVE_PX) {
+      if (
+        !touch.moved &&
+        (Math.abs(t.clientX - touch.x) > MOVE_PX || Math.abs(t.clientY - touch.y) > MOVE_PX)
+      ) {
         touch.moved = true; // es un desplazamiento, no un toque
+        touch.vertical = Math.abs(t.clientY - touch.y) >= Math.abs(t.clientX - touch.x);
+        touch.lastY = t.clientY;
         clearTimeout(touch.timer);
+      }
+      if (touch.moved && touch.vertical) {
+        ev.preventDefault();
+        scrollPx(touch.lastY - t.clientY);
+        touch.lastY = t.clientY;
+        var now = performance.now();
+        touch.samples.push({ t: now, y: t.clientY });
+        while (touch.samples.length && now - touch.samples[0].t > 100) {
+          touch.samples.shift();
+        }
       }
     },
     { passive: false },
@@ -181,7 +283,18 @@
       post({ type: 'selection', text: term.getSelection() });
       return;
     }
-    if (t.moved) return;
+    if (t.moved) {
+      if (t.vertical && t.samples.length > 1) {
+        var a = t.samples[0];
+        var b = t.samples[t.samples.length - 1];
+        var dtm = b.t - a.t;
+        if (dtm > 0 && performance.now() - b.t < 80) {
+          var v = (a.y - b.y) / dtm; // px/ms; > 0 = dedo hacia arriba
+          if (Math.abs(v) > 0.3) startFling(v);
+        }
+      }
+      return;
+    }
     if (term.hasSelection()) {
       term.clearSelection(); // un toque fuera descarta la selección
       post({ type: 'selectionCleared' });

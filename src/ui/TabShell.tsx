@@ -1,5 +1,11 @@
-import React from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import React, { useMemo, useRef } from 'react';
+import {
+  PanResponder,
+  Pressable,
+  StyleSheet,
+  Text,
+  View,
+} from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { colors } from './kit';
 
@@ -29,6 +35,31 @@ export function TabShell({
   onSettings(): void;
   children: React.ReactNode;
 }) {
+  // Deslizar a izquierda/derecha cambia de pestaña. Solo se reclama el gesto
+  // si es claramente horizontal, para no robar el desplazamiento de listas.
+  const cur = useRef({ tab, onTab });
+  cur.current = { tab, onTab };
+  const swipe = useMemo(
+    () =>
+      PanResponder.create({
+        onMoveShouldSetPanResponderCapture: (_e, g) =>
+          Math.abs(g.dx) > 24 && Math.abs(g.dx) > Math.abs(g.dy) * 2,
+        onPanResponderTerminationRequest: () => true,
+        onPanResponderRelease: (_e, g) => {
+          const dir =
+            g.dx < -60 || g.vx < -0.5 ? 1 : g.dx > 60 || g.vx > 0.5 ? -1 : 0;
+          if (!dir) {
+            return;
+          }
+          const i = TABS.findIndex(t => t.id === cur.current.tab);
+          const next = TABS[i + dir];
+          if (next) {
+            cur.current.onTab(next.id);
+          }
+        },
+      }),
+    [],
+  );
   return (
     <SafeAreaView style={local.root} edges={['top', 'left', 'right']}>
       <View style={local.header}>
@@ -84,7 +115,9 @@ export function TabShell({
           );
         })}
       </View>
-      <View style={local.body}>{children}</View>
+      <View style={local.body} {...swipe.panHandlers}>
+        {children}
+      </View>
     </SafeAreaView>
   );
 }
