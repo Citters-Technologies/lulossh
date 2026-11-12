@@ -79,7 +79,7 @@ android {
 
     namespace "com.lulossh"
     defaultConfig {
-        applicationId "com.lulossh"
+        applicationId "com.citters.lulossh"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
         versionCode 1
