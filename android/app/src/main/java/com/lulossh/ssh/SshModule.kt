@@ -109,6 +109,27 @@ class SshModule(private val rc: ReactApplicationContext) : ReactContextBaseJavaM
 
     private val uiPrefs by lazy { rc.getSharedPreferences("lulossh_ui", android.content.Context.MODE_PRIVATE) }
 
+    /**
+     * Constantes leídas de forma síncrona al cargar JS. El modo claro/oscuro
+     * tiene que conocerse antes de crear los estilos.
+     */
+    override fun getConstants(): Map<String, Any> =
+        mapOf("appTheme" to (uiPrefs.getString("appTheme", null) ?: "dark"))
+
+    /**
+     * Reinicia la interfaz (recarga JS) para aplicar el modo claro/oscuro.
+     * Cierra antes las sesiones: viven en este módulo y la recarga crea uno
+     * nuevo, así que quedarían huérfanas.
+     */
+    @ReactMethod
+    fun reloadUi() {
+        sessions.keys.toList().forEach { closeSession(it) }
+        android.os.Handler(android.os.Looper.getMainLooper()).post {
+            (rc.applicationContext as? com.facebook.react.ReactApplication)
+                ?.reactHost?.reload("Cambio de tema")
+        }
+    }
+
     @ReactMethod
     fun setVolumeKeysEnabled(enabled: Boolean) {
         VolumeKeys.attach(rc)

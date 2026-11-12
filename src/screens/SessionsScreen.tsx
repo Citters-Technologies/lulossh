@@ -1,5 +1,12 @@
 import React from 'react';
-import { Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import {
+  Alert,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
+} from 'react-native';
 import { LiveSession } from '../native/SshModule';
 import { Button, colors, styles } from '../ui/kit';
 
@@ -70,7 +77,9 @@ export function SessionsScreen({
                   <Text style={styles.rowTitle} numberOfLines={1}>
                     {s.title}
                   </Text>
-                  <Text style={styles.rowSub}>Abierta {since(s.startedAt)}</Text>
+                  <Text style={styles.rowSub}>
+                    Abierta {since(s.startedAt)}
+                  </Text>
                 </View>
                 <Text style={local.open}>Abrir ›</Text>
               </Pressable>
@@ -114,10 +123,15 @@ const local = StyleSheet.create({
     marginBottom: 10,
     overflow: 'hidden',
     borderLeftWidth: 3,
-    borderLeftColor: '#22c55e',
+    borderLeftColor: colors.success,
   },
   main: { flexDirection: 'row', alignItems: 'center', gap: 12, padding: 14 },
-  dot: { width: 10, height: 10, borderRadius: 5, backgroundColor: '#22c55e' },
+  dot: {
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+    backgroundColor: colors.success,
+  },
   flex: { flex: 1 },
   open: { color: colors.accent, fontWeight: '700' },
   close: {
@@ -126,9 +140,9 @@ const local = StyleSheet.create({
     paddingVertical: 10,
     alignItems: 'center',
   },
-  closeText: { color: '#ff7b72', fontWeight: '600' },
+  closeText: { color: colors.dangerText, fontWeight: '600' },
   dim: { opacity: 0.6 },
   empty: { alignItems: 'center', marginTop: 48, gap: 6, paddingHorizontal: 16 },
   emptyIcon: { fontSize: 40 },
-  emptyTitle: { color: '#fff', fontSize: 18, fontWeight: '700' },
+  emptyTitle: { color: colors.strong, fontSize: 18, fontWeight: '700' },
 });

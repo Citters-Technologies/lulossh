@@ -88,6 +88,35 @@ export const TERM_THEMES: TermTheme[] = [
     },
   },
   {
+    // Negro sobre blanco, como un terminal clásico. Colores ANSI oscurecidos
+    // para que se lean sobre fondo blanco (el amarillo puro no se ve).
+    id: 'paper',
+    name: 'Papel (negro sobre blanco)',
+    colors: {
+      background: '#ffffff',
+      foreground: '#000000',
+      cursor: '#000000',
+      cursorAccent: '#ffffff',
+      selectionBackground: '#b4d5fe',
+      black: '#000000',
+      red: '#b91c1c',
+      green: '#15803d',
+      yellow: '#a16207',
+      blue: '#1d4ed8',
+      magenta: '#a21caf',
+      cyan: '#0e7490',
+      white: '#6b7280',
+      brightBlack: '#4b5563',
+      brightRed: '#dc2626',
+      brightGreen: '#16a34a',
+      brightYellow: '#ca8a04',
+      brightBlue: '#2563eb',
+      brightMagenta: '#c026d3',
+      brightCyan: '#0891b2',
+      brightWhite: '#374151',
+    },
+  },
+  {
     id: 'solarized-light',
     name: 'Solarized Light',
     colors: {

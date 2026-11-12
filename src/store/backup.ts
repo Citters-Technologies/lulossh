@@ -15,6 +15,7 @@ export const BACKUP_PREFS = [
   'terminalFontSize',
   'terminalTheme',
   'terminalFont',
+  'appTheme',
   'appLock',
   'appLockAfter',
 ];
@@ -79,6 +80,7 @@ export function mergeById<T extends { id: string }>(
 }
 
 export const backupFileName = (d = new Date()) =>
-  `lulossh-${d.getFullYear()}${String(d.getMonth() + 1).padStart(2, '0')}${String(
-    d.getDate(),
-  ).padStart(2, '0')}.lulossh`;
+  `lulossh-${d.getFullYear()}${String(d.getMonth() + 1).padStart(
+    2,
+    '0',
+  )}${String(d.getDate()).padStart(2, '0')}.lulossh`;

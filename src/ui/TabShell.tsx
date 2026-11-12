@@ -194,8 +194,8 @@ const local = StyleSheet.create({
     paddingTop: 10,
     paddingBottom: 6,
   },
-  brand: { flex: 1, color: '#fff', fontSize: 22, fontWeight: '800' },
-  brandAccent: { color: '#9be22d' },
+  brand: { flex: 1, color: colors.strong, fontSize: 22, fontWeight: '800' },
+  brandAccent: { color: colors.brand },
   headerBtn: {
     paddingHorizontal: 12,
     paddingVertical: 8,
@@ -214,7 +214,7 @@ const local = StyleSheet.create({
     borderRadius: 20,
   },
   gearText: { fontSize: 20 },
-  primaryText: { color: '#fff' },
+  primaryText: { color: colors.onAccent },
   tabs: {
     flexDirection: 'row',
     marginHorizontal: 12,
@@ -238,7 +238,7 @@ const local = StyleSheet.create({
     fontWeight: '600',
     marginTop: 2,
   },
-  tabLabelOn: { color: '#fff' },
+  tabLabelOn: { color: colors.strong },
   badge: {
     position: 'absolute',
     top: 2,
@@ -246,7 +246,7 @@ const local = StyleSheet.create({
     minWidth: 18,
     height: 18,
     borderRadius: 9,
-    backgroundColor: '#22c55e',
+    backgroundColor: colors.success,
     alignItems: 'center',
     justifyContent: 'center',
     paddingHorizontal: 4,

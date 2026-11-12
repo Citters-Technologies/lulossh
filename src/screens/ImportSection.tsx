@@ -1,12 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import {
-  Alert,
-  Modal,
-  Pressable,
-  StyleSheet,
-  Text,
-  View,
-} from 'react-native';
+import { Alert, Modal, Pressable, StyleSheet, Text, View } from 'react-native';
 import { expectExternalActivity } from '../ui/appLock';
 import { confirmUpdates, importFromJuiceSsh, showSummary } from '../import/ui';
 import { ImportResult, parseImport } from '../import/xshell';
@@ -80,7 +73,9 @@ export function ImportSection({ store }: { store: Store }) {
       }
     }
     if (r.incomplete) {
-      extra.push('Importa sus claves (OpenSSH) desde Claves o vuelve a importar con los .pem.');
+      extra.push(
+        'Importa sus claves (OpenSSH) desde Claves o vuelve a importar con los .pem.',
+      );
     }
     showSummary('Importación de Xshell', r, extra.join('\n') || undefined);
   };
@@ -107,7 +102,10 @@ export function ImportSection({ store }: { store: Store }) {
       if (ok === 0) {
         setXMaster(m =>
           m
-            ? { ...m, error: 'Contraseña maestra incorrecta (no cuadró ninguna).' }
+            ? {
+                ...m,
+                error: 'Contraseña maestra incorrecta (no cuadró ninguna).',
+              }
             : m,
         );
         return;
@@ -189,7 +187,9 @@ export function ImportSection({ store }: { store: Store }) {
               secureTextEntry
               autoFocus
             />
-            {xMaster?.error && <Text style={styles.error}>{xMaster.error}</Text>}
+            {xMaster?.error && (
+              <Text style={styles.error}>{xMaster.error}</Text>
+            )}
             <Button
               title={busy ? 'Descifrando…' : 'Descifrar e importar'}
               disabled={busy || !xMaster?.pw}
@@ -251,7 +251,7 @@ const local = StyleSheet.create({
   },
   line: { flexDirection: 'row', alignItems: 'center', gap: 12 },
   lineText: { flex: 1 },
-  title: { color: '#fff', fontSize: 16, fontWeight: '600' },
+  title: { color: colors.strong, fontSize: 16, fontWeight: '600' },
   sub: { color: colors.muted, marginTop: 2, fontSize: 13 },
   icon: { fontSize: 20, width: 28, textAlign: 'center' },
   chev: { color: colors.muted, fontSize: 22 },

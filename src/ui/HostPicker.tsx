@@ -92,7 +92,7 @@ export function HostPicker({
             value={q}
             onChangeText={setQ}
             placeholder="Buscar"
-            placeholderTextColor="#5b6b7c"
+            placeholderTextColor={colors.faint}
             autoCapitalize="none"
             autoCorrect={false}
             style={local.search}
@@ -219,8 +219,8 @@ const local = StyleSheet.create({
     marginBottom: 6,
     marginLeft: 12,
   },
-  hostOn: { backgroundColor: '#1d3557' },
-  hostName: { color: '#fff', fontWeight: '600' },
+  hostOn: { backgroundColor: colors.selected },
+  hostName: { color: colors.strong, fontWeight: '600' },
   flex: { flex: 1 },
   bottom: { padding: 16 },
 });

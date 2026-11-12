@@ -20,7 +20,10 @@ type Mode = 'list' | 'generate' | 'import';
 
 /** Tipo legible: "ssh-ed25519" -> "ED25519", "ecdsa-sha2-nistp256" -> "ECDSA". */
 const shortType = (t: string) =>
-  t.replace(/^ssh-/, '').replace(/^ecdsa-sha2-.*/, 'ecdsa').toUpperCase();
+  t
+    .replace(/^ssh-/, '')
+    .replace(/^ecdsa-sha2-.*/, 'ecdsa')
+    .toUpperCase();
 
 /** Final de la clave pública, para distinguirlas a simple vista. */
 const tail = (pub: string) => {
@@ -169,7 +172,10 @@ export function KeysScreen({
       {!embedded && (
         <Header
           title="Claves"
-          left={{ label: '‹ Volver', onPress: mode === 'list' ? onBack : reset }}
+          left={{
+            label: '‹ Volver',
+            onPress: mode === 'list' ? onBack : reset,
+          }}
         />
       )}
       <ScrollView
@@ -179,7 +185,11 @@ export function KeysScreen({
         {mode === 'list' && (
           <>
             <View style={local.actions}>
-              <Pill label="＋ Generar" primary onPress={() => setMode('generate')} />
+              <Pill
+                label="＋ Generar"
+                primary
+                onPress={() => setMode('generate')}
+              />
               <Pill label="⇪ Importar" onPress={startImport} />
             </View>
             {error && <Text style={styles.error}>{error}</Text>}
@@ -210,9 +220,21 @@ export function KeysScreen({
                       {n ? ` · ${n} en uso` : ''}
                     </Text>
                   </View>
-                  <Icon label="⧉" hint="Copiar clave pública" onPress={() => copyPublic(k)} />
-                  <Icon label="⤴" hint="Compartir clave pública" onPress={() => sharePublic(k)} />
-                  <Icon label="🗑" hint="Borrar clave" onPress={() => remove(k)} />
+                  <Icon
+                    label="⧉"
+                    hint="Copiar clave pública"
+                    onPress={() => copyPublic(k)}
+                  />
+                  <Icon
+                    label="⤴"
+                    hint="Compartir clave pública"
+                    onPress={() => sharePublic(k)}
+                  />
+                  <Icon
+                    label="🗑"
+                    hint="Borrar clave"
+                    onPress={() => remove(k)}
+                  />
                 </View>
               );
             })}
@@ -281,7 +303,9 @@ export function KeysScreen({
                 label={busy ? 'Importando…' : 'Importar'}
                 primary
                 disabled={busy || !name.trim() || !isPrivateKeyText(pem)}
-                onPress={() => run(() => store.importKey(name.trim(), pem, passphrase))}
+                onPress={() =>
+                  run(() => store.importKey(name.trim(), pem, passphrase))
+                }
               />
             </View>
           </View>
@@ -312,7 +336,9 @@ function Pill({
         (pressed || disabled) && local.dim,
       ]}
     >
-      <Text style={[local.pillText, primary && local.pillTextPrimary]}>{label}</Text>
+      <Text style={[local.pillText, primary && local.pillTextPrimary]}>
+        {label}
+      </Text>
     </Pressable>
   );
 }
@@ -349,7 +375,7 @@ const local = StyleSheet.create({
   },
   pillPrimary: { backgroundColor: colors.accent },
   pillText: { color: colors.text, fontWeight: '600' },
-  pillTextPrimary: { color: '#fff' },
+  pillTextPrimary: { color: colors.onAccent },
   dim: { opacity: 0.5 },
   card: {
     flexDirection: 'row',
@@ -371,9 +397,9 @@ const local = StyleSheet.create({
   },
   avatarText: { fontSize: 17 },
   text: { flex: 1 },
-  name: { color: '#fff', fontSize: 15, fontWeight: '600' },
+  name: { color: colors.strong, fontSize: 15, fontWeight: '600' },
   sub: { color: colors.muted, fontSize: 12, marginTop: 2 },
-  badge: { color: '#f5b301', fontWeight: '700' },
+  badge: { color: colors.warn, fontWeight: '700' },
   icon: {
     width: 34,
     height: 34,
@@ -383,12 +409,27 @@ const local = StyleSheet.create({
   },
   iconPressed: { backgroundColor: colors.surface2 },
   iconText: { color: colors.text, fontSize: 17 },
-  hint: { color: '#5b6b7c', fontSize: 12, textAlign: 'center', marginTop: 12 },
+  hint: {
+    color: colors.faint,
+    fontSize: 12,
+    textAlign: 'center',
+    marginTop: 12,
+  },
   empty: { alignItems: 'center', marginTop: 40, gap: 6 },
   emptyIcon: { fontSize: 36 },
-  emptyTitle: { color: '#fff', fontSize: 17, fontWeight: '700' },
-  form: { backgroundColor: colors.surface, borderRadius: 14, padding: 14, gap: 4 },
-  formTitle: { color: '#fff', fontSize: 16, fontWeight: '700', marginBottom: 8 },
+  emptyTitle: { color: colors.strong, fontSize: 17, fontWeight: '700' },
+  form: {
+    backgroundColor: colors.surface,
+    borderRadius: 14,
+    padding: 14,
+    gap: 4,
+  },
+  formTitle: {
+    color: colors.strong,
+    fontSize: 16,
+    fontWeight: '700',
+    marginBottom: 8,
+  },
   formButtons: {
     flexDirection: 'row',
     justifyContent: 'flex-end',
@@ -396,5 +437,5 @@ const local = StyleSheet.create({
     gap: 8,
     marginTop: 8,
   },
-  loaded: { color: '#22c55e', fontWeight: '600', marginBottom: 10 },
+  loaded: { color: colors.success, fontWeight: '600', marginBottom: 10 },
 });

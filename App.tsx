@@ -22,7 +22,7 @@ import {
   LockSettings,
   shouldRelock,
 } from './src/ui/appLock';
-import { colors } from './src/ui/kit';
+import { colors, isLight } from './src/ui/kit';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { importFromJuiceSsh } from './src/import/ui';
 import { LiveSession, Ssh } from './src/native/SshModule';
@@ -405,7 +405,7 @@ export default function App() {
 
   return (
     <SafeAreaProvider>
-      <StatusBar barStyle="light-content" />
+      <StatusBar barStyle={isLight ? 'dark-content' : 'light-content'} />
       {/* Bloqueado: no se pinta nada de la app (las sesiones siguen en nativo). */}
       {locked === false ? (
         <>

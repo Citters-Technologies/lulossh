@@ -107,6 +107,8 @@ export interface SshModuleSpec {
   /** Preferencias de interfaz NO sensibles, sin cifrar. */
   prefGet(name: string): Promise<string | null>;
   prefSet(name: string, value: string): Promise<void>;
+  /** Reinicia la interfaz (aplica modo claro/oscuro). Cierra las sesiones. */
+  reloadUi(): void;
 
   /**
    * Selector de ficheros (varios). Los zip (.xts/.zip) se expanden conservando

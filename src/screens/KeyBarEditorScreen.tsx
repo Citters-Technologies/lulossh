@@ -31,7 +31,8 @@ const NO_MODS = { ctrl: false, alt: false, shift: false };
 type Sel = { row: number; idx: number } | null;
 type Draft = { label: string; text: string; enter: boolean; editing?: boolean };
 
-const clone = (l: KeyboardLayout): KeyboardLayout => JSON.parse(JSON.stringify(l));
+const clone = (l: KeyboardLayout): KeyboardLayout =>
+  JSON.parse(JSON.stringify(l));
 
 export function KeyBarEditorScreen({ onBack }: { onBack(): void }) {
   const [layout, setLayout] = useState<KeyboardLayout>(DEFAULT_LAYOUT);
@@ -62,14 +63,20 @@ export function KeyBarEditorScreen({ onBack }: { onBack(): void }) {
 
   const move = (dx: number) =>
     sel &&
-    update(rs => {
-      const r = rs[sel.row];
-      const j = sel.idx + dx;
-      if (j < 0 || j >= r.length) {
-        return;
-      }
-      [r[sel.idx], r[j]] = [r[j], r[sel.idx]];
-    }, { row: sel.row, idx: Math.max(0, Math.min(rows[sel.row].length - 1, sel.idx + dx)) });
+    update(
+      rs => {
+        const r = rs[sel.row];
+        const j = sel.idx + dx;
+        if (j < 0 || j >= r.length) {
+          return;
+        }
+        [r[sel.idx], r[j]] = [r[j], r[sel.idx]];
+      },
+      {
+        row: sel.row,
+        idx: Math.max(0, Math.min(rows[sel.row].length - 1, sel.idx + dx)),
+      },
+    );
 
   const moveRow = (dy: number) => {
     if (!sel) {
@@ -80,10 +87,13 @@ export function KeyBarEditorScreen({ onBack }: { onBack(): void }) {
       return;
     }
     const idx = Math.min(sel.idx, rows[to].length);
-    update(rs => {
-      const [b] = rs[sel.row].splice(sel.idx, 1);
-      rs[to].splice(idx, 0, b);
-    }, { row: to, idx });
+    update(
+      rs => {
+        const [b] = rs[sel.row].splice(sel.idx, 1);
+        rs[to].splice(idx, 0, b);
+      },
+      { row: to, idx },
+    );
   };
 
   const remove = () =>
@@ -95,9 +105,12 @@ export function KeyBarEditorScreen({ onBack }: { onBack(): void }) {
   const insert = (btn: KeyButton) => {
     const row = sel ? sel.row : rows.length - 1;
     const idx = sel ? sel.idx + 1 : rows[row].length;
-    update(rs => {
-      rs[row].splice(idx, 0, btn);
-    }, { row, idx });
+    update(
+      rs => {
+        rs[row].splice(idx, 0, btn);
+      },
+      { row, idx },
+    );
   };
 
   const addFromCatalog = (c: CatalogKey) => {
@@ -111,7 +124,10 @@ export function KeyBarEditorScreen({ onBack }: { onBack(): void }) {
     }
     const label = draft.label.trim();
     if (!label) {
-      Alert.alert('Falta la etiqueta', 'Escribe el texto que se verá en la tecla.');
+      Alert.alert(
+        'Falta la etiqueta',
+        'Escribe el texto que se verá en la tecla.',
+      );
       return;
     }
     const seq = parseEscapes(draft.text) + (draft.enter ? '\r' : '');
@@ -142,7 +158,8 @@ export function KeyBarEditorScreen({ onBack }: { onBack(): void }) {
       return;
     }
     const a = selected.action;
-    const seq = a.kind === 'macro' ? a.sequence : a.kind === 'text' ? a.text : '';
+    const seq =
+      a.kind === 'macro' ? a.sequence : a.kind === 'text' ? a.text : '';
     const enter = seq.endsWith('\r');
     setDraft({
       label: selected.label,
@@ -238,7 +255,9 @@ export function KeyBarEditorScreen({ onBack }: { onBack(): void }) {
           />
         </View>
 
-        <Text style={styles.section}>Toca una tecla para moverla o quitarla</Text>
+        <Text style={styles.section}>
+          Toca una tecla para moverla o quitarla
+        </Text>
         {rows.map((row, r) => (
           <View key={r} style={local.editRow}>
             <Text style={local.rowLabel}>{r + 1}</Text>
@@ -255,7 +274,9 @@ export function KeyBarEditorScreen({ onBack }: { onBack(): void }) {
                   </Pressable>
                 );
               })}
-              {row.length === 0 && <Text style={local.emptyRow}>(fila vacía)</Text>}
+              {row.length === 0 && (
+                <Text style={local.emptyRow}>(fila vacía)</Text>
+              )}
             </View>
           </View>
         ))}
@@ -281,10 +302,16 @@ export function KeyBarEditorScreen({ onBack }: { onBack(): void }) {
           <Button
             title="＋ Añadir fila"
             kind="secondary"
-            onPress={() => update(rs => void rs.push([]), { row: rows.length, idx: -1 })}
+            onPress={() =>
+              update(rs => void rs.push([]), { row: rows.length, idx: -1 })
+            }
           />
         )}
-        <Button title="Restablecer botonera de serie" kind="danger" onPress={reset} />
+        <Button
+          title="Restablecer botonera de serie"
+          kind="danger"
+          onPress={reset}
+        />
         <Text style={local.tip}>
           Las teclas nuevas se añaden detrás de la seleccionada (o al final).
           Cada capa secundaria necesita una tecla para volver: si falta, se
@@ -311,7 +338,10 @@ export function KeyBarEditorScreen({ onBack }: { onBack(): void }) {
                     <Pressable
                       key={c.base + c.label}
                       onPress={() => addFromCatalog(c)}
-                      style={({ pressed }) => [local.chip, pressed && local.chipOn]}
+                      style={({ pressed }) => [
+                        local.chip,
+                        pressed && local.chipOn,
+                      ]}
                     >
                       <Text style={local.chipText}>{c.label}</Text>
                       {c.hint && <Text style={local.chipHint}>{c.hint}</Text>}
@@ -354,7 +384,9 @@ export function KeyBarEditorScreen({ onBack }: { onBack(): void }) {
                   <Text style={styles.rowSub}>Pulsar Enter al final</Text>
                   <Switch
                     value={draft?.enter ?? false}
-                    onValueChange={enter => setDraft(d => (d ? { ...d, enter } : d))}
+                    onValueChange={enter =>
+                      setDraft(d => (d ? { ...d, enter } : d))
+                    }
                   />
                 </View>
                 <Text style={local.tip}>
@@ -363,7 +395,11 @@ export function KeyBarEditorScreen({ onBack }: { onBack(): void }) {
               </>
             )}
             <Button title="Guardar tecla" onPress={saveDraft} />
-            <Button title="Cancelar" kind="secondary" onPress={() => setDraft(null)} />
+            <Button
+              title="Cancelar"
+              kind="secondary"
+              onPress={() => setDraft(null)}
+            />
           </View>
         </View>
       </Modal>
@@ -407,7 +443,7 @@ const local = StyleSheet.create({
     borderWidth: 1,
     borderColor: 'transparent',
   },
-  chipOn: { borderColor: colors.accent, backgroundColor: '#1d3557' },
+  chipOn: { borderColor: colors.accent, backgroundColor: colors.selected },
   chipText: { color: colors.text, fontWeight: '600' },
   chipHint: { color: colors.muted, fontSize: 11, marginTop: 2 },
   emptyRow: { color: colors.muted, paddingTop: 8 },
@@ -423,7 +459,7 @@ const local = StyleSheet.create({
     paddingHorizontal: 14,
     paddingVertical: 10,
   },
-  toolDanger: { backgroundColor: '#3b1d1d' },
+  toolDanger: { backgroundColor: colors.dangerBg },
   tip: { color: colors.muted, fontSize: 12, marginTop: 12 },
   switchRow: {
     flexDirection: 'row',

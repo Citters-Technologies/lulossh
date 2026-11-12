@@ -50,7 +50,11 @@ export function IdentitiesScreen({
     if (!draft) {
       return;
     }
-    const d = { ...draft, name: draft.name.trim(), username: draft.username.trim() };
+    const d = {
+      ...draft,
+      name: draft.name.trim(),
+      username: draft.username.trim(),
+    };
     if (!d.username) {
       setError('Falta el usuario');
       return;
@@ -84,7 +88,9 @@ export function IdentitiesScreen({
       'Borrar identidad',
       `¿Borrar “${i.name}”?` +
         (usedBy(i.id)
-          ? ` ${usedBy(i.id)} hosts dejarán de usarla (vuelven a sus propios datos).`
+          ? ` ${usedBy(
+              i.id,
+            )} hosts dejarán de usarla (vuelven a sus propios datos).`
           : ''),
       [
         { text: 'Cancelar', style: 'cancel' },
@@ -156,12 +162,16 @@ export function IdentitiesScreen({
           />
         ) : (
           store.keys.map(k => {
-            const on = draft.auth.type === 'privateKey' && draft.auth.keyId === k.id;
+            const on =
+              draft.auth.type === 'privateKey' && draft.auth.keyId === k.id;
             return (
               <Pressable
                 key={k.id}
                 onPress={() =>
-                  setDraft({ ...draft, auth: { type: 'privateKey', keyId: k.id } })
+                  setDraft({
+                    ...draft,
+                    auth: { type: 'privateKey', keyId: k.id },
+                  })
                 }
                 style={[styles.row, on && local.selected]}
               >
@@ -211,7 +221,9 @@ export function IdentitiesScreen({
                     ? '🔒 contraseña'
                     : `🔑 ${
                         store.keys.find(
-                          k => i.auth.type === 'privateKey' && k.id === i.auth.keyId,
+                          k =>
+                            i.auth.type === 'privateKey' &&
+                            k.id === i.auth.keyId,
                         )?.name ?? 'clave borrada'
                       }`}
                 </Text>
@@ -244,7 +256,9 @@ export function IdentitiesScreen({
         hosts={store.hosts}
         initial={
           assigning
-            ? store.hosts.filter(h => h.identityId === assigning.id).map(h => h.id)
+            ? store.hosts
+                .filter(h => h.identityId === assigning.id)
+                .map(h => h.id)
             : []
         }
         isIncomplete={store.isIncomplete}
@@ -301,7 +315,7 @@ const local = StyleSheet.create({
     paddingVertical: 8,
     alignItems: 'center',
   },
-  actionDanger: { backgroundColor: '#3b1d1d' },
+  actionDanger: { backgroundColor: colors.dangerBg },
   actionText: { color: colors.text, fontWeight: '600' },
   selected: { borderWidth: 2, borderColor: colors.accent },
   dim: { opacity: 0.6 },

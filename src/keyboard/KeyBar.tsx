@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { colors } from '../ui/kit';
 import {
   KeyboardLayout,
   KeyButton,
@@ -97,19 +98,23 @@ export function KeyBar({ layout, mods, onToggleModifier, onSend }: Props) {
 }
 
 const styles = StyleSheet.create({
-  bar: { backgroundColor: '#161c24', paddingVertical: 4, paddingHorizontal: 2 },
+  bar: {
+    backgroundColor: colors.surface,
+    paddingVertical: 4,
+    paddingHorizontal: 2,
+  },
   row: { flexDirection: 'row' },
   key: {
     flex: 1,
     minHeight: 40,
     margin: 2,
     borderRadius: 6,
-    backgroundColor: '#242d38',
+    backgroundColor: colors.surface2,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  keyActive: { backgroundColor: '#3b82f6' },
-  keyPressed: { backgroundColor: '#35414f' },
-  label: { color: '#d7dde5', fontSize: 14, paddingHorizontal: 2 },
-  labelActive: { color: '#fff', fontWeight: '700' },
+  keyActive: { backgroundColor: colors.accent },
+  keyPressed: { backgroundColor: colors.pressed },
+  label: { color: colors.text, fontSize: 14, paddingHorizontal: 2 },
+  labelActive: { color: colors.onAccent, fontWeight: '700' },
 });

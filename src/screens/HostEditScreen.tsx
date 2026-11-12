@@ -91,7 +91,9 @@ export function HostEditScreen({
       draft.fingerprint = undefined;
     }
     // Con identidad, el usuario y las credenciales salen de ella.
-    const err = validateHost(identity ? resolveHost(draft as Host, [identity]) : draft);
+    const err = validateHost(
+      identity ? resolveHost(draft as Host, [identity]) : draft,
+    );
     setError(err);
     if (err) {
       return;
@@ -199,8 +201,7 @@ export function HostEditScreen({
           store.identities.length === 0 ? (
             <Text style={styles.rowSub}>
               Aún no hay identidades. Créalas en la pestaña “Identidades” (un
-              usuario con su clave o contraseña, reutilizable en muchos
-              hosts).
+              usuario con su clave o contraseña, reutilizable en muchos hosts).
             </Text>
           ) : (
             store.identities.map(i => (
@@ -237,7 +238,10 @@ export function HostEditScreen({
               onPress={() => setKeyId(k.id)}
               style={[
                 styles.row,
-                k.id === keyId && { borderWidth: 2, borderColor: '#3b82f6' },
+                k.id === keyId && {
+                  borderWidth: 2,
+                  borderColor: colors.accent,
+                },
               ]}
             >
               <Text style={styles.rowTitle}>{k.name}</Text>

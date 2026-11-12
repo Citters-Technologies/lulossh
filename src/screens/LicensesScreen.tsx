@@ -76,7 +76,7 @@ const local = StyleSheet.create({
     justifyContent: 'space-between',
     gap: 8,
   },
-  name: { color: '#fff', fontSize: 16, fontWeight: '700' },
+  name: { color: colors.strong, fontSize: 16, fontWeight: '700' },
   lic: { color: colors.accent, fontWeight: '700' },
   badge: {
     color: colors.muted,
@@ -89,9 +89,9 @@ const local = StyleSheet.create({
     overflow: 'hidden',
   },
   use: { color: colors.muted, fontSize: 13 },
-  link: { color: '#7fb0ff', fontSize: 12 },
+  link: { color: colors.link, fontSize: 12 },
   foot: {
-    color: '#5b6b7c',
+    color: colors.faint,
     fontSize: 12,
     textAlign: 'center',
     marginTop: 12,

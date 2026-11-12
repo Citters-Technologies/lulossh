@@ -276,7 +276,7 @@ export function HostsScreen({
               value={q}
               onChangeText={setQ}
               placeholder="Buscar por nombre, usuario, host o carpeta"
-              placeholderTextColor="#5b6b7c"
+              placeholderTextColor={colors.faint}
               autoCapitalize="none"
               autoCorrect={false}
               style={local.searchInput}
@@ -301,12 +301,19 @@ export function HostsScreen({
         )}
 
         {live.length > 0 && !searching && (
-          <Section title="Sesiones abiertas" icon="●" iconColor="#22c55e">
+          <Section
+            title="Sesiones abiertas"
+            icon="●"
+            iconColor={colors.success}
+          >
             {live.map(s => (
               <View key={s.sessionId} style={[local.card, local.liveCard]}>
                 <Pressable
                   onPress={() => onResume(s)}
-                  style={({ pressed }) => [local.liveMain, pressed && local.dim]}
+                  style={({ pressed }) => [
+                    local.liveMain,
+                    pressed && local.dim,
+                  ]}
                 >
                   <Text style={local.hostName} numberOfLines={1}>
                     {s.title}
@@ -339,13 +346,17 @@ export function HostsScreen({
         )}
 
         {favs.length > 0 && !searching && (
-          <Section title="Favoritos" icon="★" iconColor="#f5b301">
+          <Section title="Favoritos" icon="★" iconColor={colors.warn}>
             {favs.map(h => renderHost(h, 0, 'fav-'))}
           </Section>
         )}
 
         {freq.length > 0 && !searching && (
-          <Section title="Usados con frecuencia" icon="↻" iconColor="#7fb0ff">
+          <Section
+            title="Usados con frecuencia"
+            icon="↻"
+            iconColor={colors.link}
+          >
             {freq.map(h => renderHost(h, 0, 'freq-'))}
           </Section>
         )}
@@ -374,7 +385,10 @@ export function HostsScreen({
                     style={[local.sortChip, sorting && local.sortChipOn]}
                   >
                     <Text
-                      style={[local.sortChipText, sorting && local.sortChipTextOn]}
+                      style={[
+                        local.sortChipText,
+                        sorting && local.sortChipTextOn,
+                      ]}
                     >
                       {sorting ? '✓ Hecho' : '✎ Editar'}
                     </Text>
@@ -406,7 +420,8 @@ export function HostsScreen({
 
         {store.loaded && store.hosts.length === 0 && (
           <Text style={local.hint}>
-            Importa tus máquinas desde ⚙️ Ajustes → Importar (Xshell o JuiceSSH).
+            Importa tus máquinas desde ⚙️ Ajustes → Importar (Xshell o
+            JuiceSSH).
           </Text>
         )}
       </ScrollView>
@@ -613,8 +628,8 @@ const local = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 12,
   },
-  brand: { flex: 1, color: '#fff', fontSize: 22, fontWeight: '800' },
-  brandAccent: { color: '#9be22d' },
+  brand: { flex: 1, color: colors.strong, fontSize: 22, fontWeight: '800' },
+  brandAccent: { color: colors.brand },
   headerBtn: {
     paddingHorizontal: 12,
     paddingVertical: 8,
@@ -623,7 +638,7 @@ const local = StyleSheet.create({
   },
   headerBtnPrimary: { backgroundColor: colors.accent },
   headerBtnText: { color: colors.text, fontWeight: '600' },
-  headerBtnPrimaryText: { color: '#fff' },
+  headerBtnPrimaryText: { color: colors.onAccent },
   body: { paddingHorizontal: 16, paddingBottom: 32 },
   search: {
     flexDirection: 'row',
@@ -680,16 +695,16 @@ const local = StyleSheet.create({
     width: 12,
     height: 12,
     borderRadius: 6,
-    backgroundColor: '#22c55e',
+    backgroundColor: colors.success,
     borderWidth: 2,
     borderColor: colors.surface,
   },
   hostText: { flex: 1 },
-  hostName: { color: '#fff', fontSize: 16, fontWeight: '600' },
+  hostName: { color: colors.strong, fontSize: 16, fontWeight: '600' },
   hostSub: { color: colors.muted, marginTop: 2, fontSize: 13 },
-  warn: { color: '#f59e0b' },
-  star: { color: '#5b6b7c', fontSize: 22, paddingHorizontal: 4 },
-  starOn: { color: '#f5b301' },
+  warn: { color: colors.warn },
+  star: { color: colors.faint, fontSize: 22, paddingHorizontal: 4 },
+  starOn: { color: colors.warn },
   folder: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -698,7 +713,12 @@ const local = StyleSheet.create({
     paddingHorizontal: 6,
     marginBottom: 4,
   },
-  chevron: { color: colors.muted, width: 12, fontSize: 16, textAlign: 'center' },
+  chevron: {
+    color: colors.muted,
+    width: 12,
+    fontSize: 16,
+    textAlign: 'center',
+  },
   folderIcon: { fontSize: 16 },
   folderName: { flex: 1, color: colors.text, fontSize: 15, fontWeight: '700' },
   badge: {
@@ -716,19 +736,19 @@ const local = StyleSheet.create({
     gap: 12,
     padding: 12,
     borderLeftWidth: 3,
-    borderLeftColor: '#22c55e',
+    borderLeftColor: colors.success,
   },
   liveMain: { flex: 1 },
   liveClose: { color: colors.muted, fontSize: 18, paddingHorizontal: 4 },
   hint: {
-    color: '#5b6b7c',
+    color: colors.faint,
     fontSize: 12,
     textAlign: 'center',
     marginTop: 16,
   },
   emptyBox: { alignItems: 'center', marginTop: 48, gap: 6 },
   emptyIcon: { fontSize: 40 },
-  emptyTitle: { color: '#fff', fontSize: 18, fontWeight: '700' },
+  emptyTitle: { color: colors.strong, fontSize: 18, fontWeight: '700' },
   importBtn: {
     marginTop: 16,
     borderRadius: 12,
@@ -743,7 +763,7 @@ const local = StyleSheet.create({
   grow: { flex: 1 },
   sortBar: { flexDirection: 'row', alignItems: 'center', gap: 12 },
   sortReset: { color: colors.muted, fontSize: 12, fontWeight: '700' },
-  sortDelete: { color: '#f87171', fontSize: 12, fontWeight: '700' },
+  sortDelete: { color: colors.dangerText, fontSize: 12, fontWeight: '700' },
   sortChip: {
     paddingHorizontal: 10,
     paddingVertical: 4,
@@ -752,8 +772,8 @@ const local = StyleSheet.create({
   },
   sortChipOn: { backgroundColor: colors.accent },
   sortChipText: { color: colors.muted, fontSize: 12, fontWeight: '700' },
-  sortChipTextOn: { color: '#fff' },
-  sortHint: { color: '#5b6b7c', fontSize: 12, marginBottom: 8 },
+  sortChipTextOn: { color: colors.onAccent },
+  sortHint: { color: colors.faint, fontSize: 12, marginBottom: 8 },
   sortBtns: { flexDirection: 'row', gap: 4 },
   sortBtn: {
     width: 34,

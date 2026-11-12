@@ -29,6 +29,7 @@ import {
   themeById,
 } from '../terminal/themes';
 import { DEFAULT_FONT, TERM_FONT_PREF } from '../terminal/font';
+import { colors } from '../ui/kit';
 import { useKeyboardHeight } from '../ui/useKeyboardHeight';
 
 const NO_MODS: ModifierState = { ctrl: false, alt: false, shift: false };
@@ -366,7 +367,8 @@ export function TerminalScreen({
     if (themeId && themeId !== DEFAULT_THEME_ID) {
       term.current?.setTheme(themeById(themeId).colors);
     }
-    const font = (await Ssh.prefGet(TERM_FONT_PREF).catch(() => null)) ?? DEFAULT_FONT;
+    const font =
+      (await Ssh.prefGet(TERM_FONT_PREF).catch(() => null)) ?? DEFAULT_FONT;
     term.current?.setFont(font);
     if (fontSize.current !== FONT_DEFAULT) {
       term.current?.setFontSize(fontSize.current);
@@ -531,7 +533,7 @@ export function TerminalScreen({
 }
 
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: '#0b0f14' },
+  root: { flex: 1, backgroundColor: colors.bg },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -540,8 +542,8 @@ const styles = StyleSheet.create({
     gap: 10,
   },
   titleBox: { flex: 1 },
-  title: { color: '#d7dde5', fontWeight: '600' },
-  status: { color: '#8fa1b3', fontSize: 12 },
+  title: { color: colors.text, fontWeight: '600' },
+  status: { color: colors.muted, fontSize: 12 },
   closeBtn: {
     borderWidth: 1,
     borderColor: '#c0504d',
@@ -550,16 +552,16 @@ const styles = StyleSheet.create({
     paddingVertical: 6,
   },
   pressed: { opacity: 0.6 },
-  back: { color: '#d7dde5', fontSize: 28, lineHeight: 30, paddingRight: 4 },
+  back: { color: colors.text, fontSize: 28, lineHeight: 30, paddingRight: 4 },
   reBtn: {
     borderWidth: 1,
-    borderColor: '#3b82f6',
+    borderColor: colors.accent,
     borderRadius: 6,
     paddingHorizontal: 12,
     paddingVertical: 6,
   },
-  reText: { color: '#7fb0ff', fontWeight: '600' },
-  closeText: { color: '#ff7b72', fontWeight: '600' },
+  reText: { color: colors.link, fontWeight: '600' },
+  closeText: { color: colors.dangerText, fontWeight: '600' },
   body: { flex: 1 },
   hint: {
     position: 'absolute',
@@ -593,12 +595,12 @@ const styles = StyleSheet.create({
     top: 8,
     alignSelf: 'center',
     flexDirection: 'row',
-    backgroundColor: '#242d38',
+    backgroundColor: colors.surface2,
     borderRadius: 10,
     overflow: 'hidden',
     elevation: 6,
   },
   selBtn: { paddingHorizontal: 16, paddingVertical: 10 },
-  selText: { color: '#fff', fontWeight: '600' },
+  selText: { color: colors.strong, fontWeight: '600' },
   aiGlyph: { fontSize: 18, fontWeight: '700' },
 });

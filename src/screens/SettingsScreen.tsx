@@ -29,8 +29,29 @@ import {
   TERM_THEMES,
   themeById,
 } from '../terminal/themes';
-import { DEFAULT_FONT, fontName, TERM_FONT_PREF, TERM_FONTS } from '../terminal/font';
-import { Button, colors, Field, Header, Segmented, styles } from '../ui/kit';
+import {
+  DEFAULT_FONT,
+  fontName,
+  TERM_FONT_PREF,
+  TERM_FONTS,
+} from '../terminal/font';
+import {
+  APP_THEME_PREF,
+  AppThemeMode,
+  appThemeMode,
+  Button,
+  colors,
+  Field,
+  Header,
+  Segmented,
+  styles,
+} from '../ui/kit';
+
+const APP_THEME_OPTIONS: { value: AppThemeMode; label: string }[] = [
+  { value: 'dark', label: 'Oscuro' },
+  { value: 'light', label: 'Claro' },
+  { value: 'system', label: 'Sistema' },
+];
 
 const REPO = 'https://github.com/Citters-Technologies/lulossh';
 
@@ -79,6 +100,35 @@ export function SettingsScreen({
     setFontId(id);
     setFontPicker(false);
     Ssh.prefSet(TERM_FONT_PREF, id).catch(() => {});
+  };
+
+  // Modo claro/oscuro: los estilos se crean al arrancar, así que aplicarlo
+  // exige reiniciar la interfaz (y eso cierra las sesiones abiertas).
+  const [appTheme, setAppTheme] = useState<AppThemeMode>(appThemeMode);
+  const chooseAppTheme = async (mode: AppThemeMode) => {
+    if (mode === appTheme) {
+      return;
+    }
+    setAppTheme(mode);
+    await Ssh.prefSet(APP_THEME_PREF, mode).catch(() => {});
+    if (mode === appThemeMode) {
+      return; // vuelve al que está aplicado: nada que reiniciar
+    }
+    const open = (await Ssh.listSessions().catch(() => [])).length;
+    if (!open) {
+      Ssh.reloadUi();
+      return;
+    }
+    Alert.alert(
+      'Reiniciar la interfaz',
+      `Para aplicar el modo hay que reiniciar la interfaz, y eso cierra ${
+        open === 1 ? 'la sesión abierta' : `las ${open} sesiones abiertas`
+      }.`,
+      [
+        { text: 'Más tarde', style: 'cancel' },
+        { text: 'Reiniciar ahora', onPress: () => Ssh.reloadUi() },
+      ],
+    );
   };
 
   useEffect(() => setPwError(null), [pw?.mode]);
@@ -193,6 +243,27 @@ export function SettingsScreen({
     <SafeAreaView style={styles.screen}>
       <Header title="Ajustes" left={{ label: '‹ Volver', onPress: onBack }} />
       <ScrollView contentContainerStyle={styles.body}>
+        <Text style={styles.section}>Apariencia</Text>
+        <View style={local.card}>
+          <View style={local.line}>
+            <Text style={local.icon}>🌓</Text>
+            <View style={local.lineText}>
+              <Text style={local.title}>Modo de la app</Text>
+              <Text style={local.sub}>
+                Colores de las pantallas. Los de la consola se eligen en
+                Terminal → Tema de color.
+              </Text>
+            </View>
+          </View>
+          <View style={local.gap}>
+            <Segmented
+              value={appTheme}
+              onChange={chooseAppTheme}
+              options={APP_THEME_OPTIONS}
+            />
+          </View>
+        </View>
+
         <Text style={styles.section}>Seguridad</Text>
         <View style={local.card}>
           <View style={local.line}>
@@ -323,9 +394,7 @@ export function SettingsScreen({
         <View style={local.backdrop}>
           <View style={[local.dialog, local.themeDialog]}>
             <Text style={local.title}>Tema de color</Text>
-            <Text style={local.sub}>
-              Se aplica al abrir una sesión nueva.
-            </Text>
+            <Text style={local.sub}>Se aplica al abrir una sesión nueva.</Text>
             <ScrollView style={local.themeList}>
               {TERM_THEMES.map(t => {
                 const on = t.id === themeId;
@@ -404,7 +473,13 @@ export function SettingsScreen({
             )}
             {pwError && <Text style={styles.error}>{pwError}</Text>}
             <Button
-              title={busy ? 'Un momento…' : pw?.mode === 'export' ? 'Exportar' : 'Restaurar'}
+              title={
+                busy
+                  ? 'Un momento…'
+                  : pw?.mode === 'export'
+                  ? 'Exportar'
+                  : 'Restaurar'
+              }
               disabled={busy}
               onPress={pw?.mode === 'export' ? doExport : doRestore}
             />
@@ -435,7 +510,11 @@ function Item({
   return (
     <Pressable
       onPress={onPress}
-      style={({ pressed }) => [local.card, local.line, pressed && local.pressed]}
+      style={({ pressed }) => [
+        local.card,
+        local.line,
+        pressed && local.pressed,
+      ]}
     >
       <Text style={local.icon}>{icon}</Text>
       <View style={local.lineText}>
@@ -456,7 +535,7 @@ const local = StyleSheet.create({
   },
   line: { flexDirection: 'row', alignItems: 'center', gap: 12 },
   lineText: { flex: 1 },
-  title: { color: '#fff', fontSize: 16, fontWeight: '600' },
+  title: { color: colors.strong, fontSize: 16, fontWeight: '600' },
   sub: { color: colors.muted, marginTop: 2, fontSize: 13 },
   gap: { marginTop: 12, marginBottom: 6 },
   icon: { fontSize: 20, width: 28, textAlign: 'center' },
@@ -498,6 +577,6 @@ const local = StyleSheet.create({
   },
   swText: { fontSize: 14, fontWeight: '700' },
   swCursor: { width: 7, height: 16, borderRadius: 1, marginLeft: 2 },
-  themeName: { flex: 1, color: '#fff', fontSize: 15, fontWeight: '600' },
+  themeName: { flex: 1, color: colors.strong, fontSize: 15, fontWeight: '600' },
   themeCheck: { color: colors.accent, fontSize: 18, fontWeight: '800' },
 });
