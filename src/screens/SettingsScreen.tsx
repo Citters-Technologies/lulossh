@@ -29,6 +29,7 @@ import {
   TERM_THEMES,
   themeById,
 } from '../terminal/themes';
+import { DEFAULT_FONT, fontName, TERM_FONT_PREF, TERM_FONTS } from '../terminal/font';
 import { Button, colors, Field, Header, Segmented, styles } from '../ui/kit';
 
 const REPO = 'https://github.com/Citters-Technologies/lulossh';
@@ -66,6 +67,18 @@ export function SettingsScreen({
     setThemeId(id);
     setThemePicker(false);
     Ssh.prefSet(TERM_THEME_PREF, id).catch(() => {});
+  };
+  const [fontId, setFontId] = useState(DEFAULT_FONT);
+  const [fontPicker, setFontPicker] = useState(false);
+  useEffect(() => {
+    Ssh.prefGet(TERM_FONT_PREF)
+      .then(v => v && setFontId(v))
+      .catch(() => {});
+  }, []);
+  const chooseFont = (id: string) => {
+    setFontId(id);
+    setFontPicker(false);
+    Ssh.prefSet(TERM_FONT_PREF, id).catch(() => {});
   };
 
   useEffect(() => setPwError(null), [pw?.mode]);
@@ -235,6 +248,12 @@ export function SettingsScreen({
           onPress={() => setThemePicker(true)}
         />
         <Item
+          icon="🔤"
+          title="Fuente"
+          sub={fontName(fontId)}
+          onPress={() => setFontPicker(true)}
+        />
+        <Item
           icon="⌨️"
           title="Botonera de teclas"
           sub="Añade, quita y ordena las teclas de encima del teclado"
@@ -255,6 +274,45 @@ export function SettingsScreen({
           onPress={onLicenses}
         />
       </ScrollView>
+
+      <Modal
+        visible={fontPicker}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setFontPicker(false)}
+      >
+        <View style={local.backdrop}>
+          <View style={local.dialog}>
+            <Text style={local.title}>Fuente de la consola</Text>
+            <Text style={local.sub}>Se aplica al abrir una sesión nueva.</Text>
+            {TERM_FONTS.map(f => {
+              const on = f.id === fontId;
+              return (
+                <Pressable
+                  key={f.id}
+                  onPress={() => chooseFont(f.id)}
+                  style={({ pressed }) => [
+                    local.themeRow,
+                    on && local.themeRowOn,
+                    pressed && local.pressed,
+                  ]}
+                >
+                  <View style={local.lineText}>
+                    <Text style={local.themeName}>{f.name}</Text>
+                    <Text style={local.sub}>{f.sub}</Text>
+                  </View>
+                  {on && <Text style={local.themeCheck}>✓</Text>}
+                </Pressable>
+              );
+            })}
+            <Button
+              title="Cerrar"
+              kind="secondary"
+              onPress={() => setFontPicker(false)}
+            />
+          </View>
+        </View>
+      </Modal>
 
       <Modal
         visible={themePicker}

@@ -32,6 +32,8 @@ export interface TerminalHandle {
   setFontSize(px: number): void;
   /** Aplica una paleta de colores (objeto de tema de xterm). */
   setTheme(theme: object): void;
+  /** Familia de fuente: 'system' o 'nerd'. */
+  setFont(which: string): void;
 }
 
 interface Props {
@@ -62,6 +64,7 @@ export const TerminalView = forwardRef<TerminalHandle, Props>(
       // JSON.stringify entrecomilla todo; seguro dentro de comillas simples.
       setTheme: theme =>
         run(`window.lulo.setTheme(${JSON.stringify(JSON.stringify(theme))})`),
+      setFont: which => run(`window.lulo.setFont(${JSON.stringify(which)})`),
     }));
 
     // Android: el teclado lo recibe una vista nativa (sin mayúsculas ni

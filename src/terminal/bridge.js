@@ -225,6 +225,12 @@
       // Esperar al re-render para medir bien las celdas nuevas.
       requestAnimationFrame(doFit);
     },
+    /** Cambia la familia de fuente ('system' o 'nerd'). */
+    setFont: function (which) {
+      term.options.fontFamily =
+        which === 'nerd' ? "'JetBrainsMonoNF', monospace" : 'monospace';
+      requestAnimationFrame(doFit);
+    },
     /** Aplica una paleta (JSON del tema): colores de xterm + cursor + fondo. */
     setTheme: function (json) {
       try {

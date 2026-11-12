@@ -14,6 +14,7 @@ export const BACKUP_PREFS = [
   'hostOrder',
   'terminalFontSize',
   'terminalTheme',
+  'terminalFont',
   'appLock',
   'appLockAfter',
 ];

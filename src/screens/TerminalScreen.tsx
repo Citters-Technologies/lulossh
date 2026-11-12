@@ -28,6 +28,7 @@ import {
   TERM_THEME_PREF,
   themeById,
 } from '../terminal/themes';
+import { DEFAULT_FONT, TERM_FONT_PREF } from '../terminal/font';
 import { useKeyboardHeight } from '../ui/useKeyboardHeight';
 
 const NO_MODS: ModifierState = { ctrl: false, alt: false, shift: false };
@@ -365,6 +366,8 @@ export function TerminalScreen({
     if (themeId && themeId !== DEFAULT_THEME_ID) {
       term.current?.setTheme(themeById(themeId).colors);
     }
+    const font = (await Ssh.prefGet(TERM_FONT_PREF).catch(() => null)) ?? DEFAULT_FONT;
+    term.current?.setFont(font);
     if (fontSize.current !== FONT_DEFAULT) {
       term.current?.setFontSize(fontSize.current);
     }
