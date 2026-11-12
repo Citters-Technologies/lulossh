@@ -1,5 +1,7 @@
-import React, { useMemo, useRef } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
+  Animated,
+  Dimensions,
   PanResponder,
   Pressable,
   StyleSheet,
@@ -18,46 +20,91 @@ const TABS: { id: Tab; label: string; icon: string }[] = [
   { id: 'keys', label: 'Claves', icon: '🔑' },
 ];
 
-/** Cabecera de la app + menú de pestañas superior. */
+const indexOf = (t: Tab) => TABS.findIndex(x => x.id === t);
+
+/** Cabecera de la app + menú de pestañas superior + páginas deslizables. */
 export function TabShell({
   tab,
   onTab,
+  onPeek,
   sessionsCount,
   action,
   onSettings,
-  children,
+  panes,
 }: {
   tab: Tab;
   onTab(t: Tab): void;
+  /** Se va a ver la pestaña `t` al arrastrar: montarla si aún no lo está. */
+  onPeek?(t: Tab): void;
   sessionsCount: number;
   /** Acción principal de la pestaña (＋ Host, ＋ Identidad…). */
   action?: { label: string; onPress(): void };
   onSettings(): void;
-  children: React.ReactNode;
+  /** Contenido de cada pestaña (null si aún no se ha montado). */
+  panes: Partial<Record<Tab, React.ReactNode>>;
 }) {
-  // Deslizar a izquierda/derecha cambia de pestaña. Solo se reclama el gesto
-  // si es claramente horizontal, para no robar el desplazamiento de listas.
-  const cur = useRef({ tab, onTab });
-  cur.current = { tab, onTab };
+  // Las pestañas van en fila y la fila sigue al dedo. Solo se reclama el
+  // gesto si es claramente horizontal, para no robar el scroll de las listas.
+  const [width, setWidth] = useState(Dimensions.get('window').width);
+  const x = useRef(new Animated.Value(-indexOf(tab) * width)).current;
+  const cur = useRef({ tab, onTab, onPeek, width });
+  cur.current = { tab, onTab, onPeek, width };
+
+  const snapTo = (i: number) =>
+    Animated.spring(x, {
+      toValue: -i * cur.current.width,
+      useNativeDriver: true,
+      speed: 20,
+      bounciness: 0,
+    }).start();
+
+  // Cambio de pestaña (por toque o al soltar): deslizar hasta ella.
+  useEffect(() => {
+    snapTo(indexOf(tab));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tab, width]);
+
   const swipe = useMemo(
     () =>
       PanResponder.create({
         onMoveShouldSetPanResponderCapture: (_e, g) =>
-          Math.abs(g.dx) > 24 && Math.abs(g.dx) > Math.abs(g.dy) * 2,
-        onPanResponderTerminationRequest: () => true,
-        onPanResponderRelease: (_e, g) => {
-          const dir =
-            g.dx < -60 || g.vx < -0.5 ? 1 : g.dx > 60 || g.vx > 0.5 ? -1 : 0;
-          if (!dir) {
-            return;
-          }
-          const i = TABS.findIndex(t => t.id === cur.current.tab);
-          const next = TABS[i + dir];
-          if (next) {
-            cur.current.onTab(next.id);
+          Math.abs(g.dx) > 16 && Math.abs(g.dx) > Math.abs(g.dy) * 2,
+        onPanResponderGrant: () => {
+          x.stopAnimation();
+          const i = indexOf(cur.current.tab);
+          for (const n of [TABS[i - 1], TABS[i + 1]]) {
+            if (n) {
+              cur.current.onPeek?.(n.id);
+            }
           }
         },
+        onPanResponderMove: (_e, g) => {
+          const i = indexOf(cur.current.tab);
+          const edge =
+            (g.dx > 0 && i === 0) || (g.dx < 0 && i === TABS.length - 1);
+          // En los extremos, resistencia (se mueve un tercio).
+          x.setValue(-i * cur.current.width + (edge ? g.dx / 3 : g.dx));
+        },
+        onPanResponderTerminationRequest: () => false,
+        onPanResponderRelease: (_e, g) => {
+          const w = cur.current.width;
+          const i = indexOf(cur.current.tab);
+          const dir =
+            g.dx < -w / 4 || g.vx < -0.4
+              ? 1
+              : g.dx > w / 4 || g.vx > 0.4
+              ? -1
+              : 0;
+          const next = TABS[i + dir];
+          if (dir && next) {
+            cur.current.onTab(next.id); // el efecto anima hasta ella
+          } else {
+            snapTo(i);
+          }
+        },
+        onPanResponderTerminate: () => snapTo(indexOf(cur.current.tab)),
       }),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     [],
   );
   return (
@@ -115,8 +162,23 @@ export function TabShell({
           );
         })}
       </View>
-      <View style={local.body} {...swipe.panHandlers}>
-        {children}
+      <View
+        style={local.body}
+        onLayout={e => setWidth(e.nativeEvent.layout.width)}
+        {...swipe.panHandlers}
+      >
+        <Animated.View
+          style={[
+            local.row,
+            { width: width * TABS.length, transform: [{ translateX: x }] },
+          ]}
+        >
+          {TABS.map(t => (
+            <View key={t.id} style={{ width }}>
+              {panes[t.id] ?? null}
+            </View>
+          ))}
+        </Animated.View>
       </View>
     </SafeAreaView>
   );
@@ -170,7 +232,12 @@ const local = StyleSheet.create({
   },
   tabOn: { backgroundColor: colors.surface2 },
   tabIcon: { fontSize: 16 },
-  tabLabel: { color: colors.muted, fontSize: 12, fontWeight: '600', marginTop: 2 },
+  tabLabel: {
+    color: colors.muted,
+    fontSize: 12,
+    fontWeight: '600',
+    marginTop: 2,
+  },
   tabLabelOn: { color: '#fff' },
   badge: {
     position: 'absolute',
@@ -185,5 +252,6 @@ const local = StyleSheet.create({
     paddingHorizontal: 4,
   },
   badgeText: { color: '#04210f', fontSize: 11, fontWeight: '800' },
-  body: { flex: 1 },
+  body: { flex: 1, overflow: 'hidden' },
+  row: { flex: 1, flexDirection: 'row' },
 });

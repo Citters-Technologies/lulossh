@@ -42,7 +42,6 @@ const appStyles = StyleSheet.create({
   hidden: { display: 'none' },
 });
 
-
 type Route =
   | { name: 'hosts' }
   | { name: 'editHost'; host?: Host }
@@ -283,64 +282,64 @@ export default function App() {
       .catch(() => {})
       .then(refreshLive);
   const pane = (t: Tab, el: React.ReactNode) =>
-    visitedTabs.has(t) ? (
-      <View key={t} style={t === tab ? appStyles.fill : appStyles.hidden}>
-        {el}
-      </View>
-    ) : null;
+    visitedTabs.has(t) ? el : null;
+  const peek = (t: Tab) =>
+    setVisitedTabs(v => (v.has(t) ? v : new Set(v).add(t)));
   const tabsView = (
-        <TabShell
-          tab={tab}
-          onTab={t => {
-            setTab(t);
-            setVisitedTabs(v => (v.has(t) ? v : new Set(v).add(t)));
-            if (t === 'sessions') {
-              refreshLive();
-            }
-          }}
-          sessionsCount={live.length}
-          onSettings={() => setRoute({ name: 'settings' })}
-          action={
-            tab === 'hosts'
-              ? { label: '＋ Host', onPress: () => setRoute({ name: 'editHost' }) }
-              : undefined
-          }
-        >
-          {pane(
-            'hosts',
-            <HostsScreen
-              store={store}
-              live={live}
-              onResume={openLive}
-              onDisconnect={disconnect}
-              onConnect={connect}
-              onEdit={h => setRoute({ name: 'editHost', host: h })}
-            />,
-          )}
-          {pane(
-            'sessions',
-            <SessionsScreen
-              live={live}
-              onResume={openLive}
-              onDisconnect={s => Ssh.disconnect(s.sessionId).catch(() => {})}
-              onRefresh={refreshLive}
-            />,
-          )}
-          {pane(
-            'identities',
-            <IdentitiesScreen
-              store={store}
-              onKeys={() => {
-                setTab('keys');
-                setVisitedTabs(v => new Set(v).add('keys'));
-              }}
-            />,
-          )}
-          {pane(
-            'keys',
-            <KeysScreen store={store} onBack={() => setTab('hosts')} embedded />,
-          )}
-        </TabShell>
+    <TabShell
+      tab={tab}
+      onTab={t => {
+        setTab(t);
+        peek(t);
+        if (t === 'sessions') {
+          refreshLive();
+        }
+      }}
+      onPeek={peek}
+      sessionsCount={live.length}
+      onSettings={() => setRoute({ name: 'settings' })}
+      action={
+        tab === 'hosts'
+          ? { label: '＋ Host', onPress: () => setRoute({ name: 'editHost' }) }
+          : undefined
+      }
+      panes={{
+        hosts: pane(
+          'hosts',
+          <HostsScreen
+            store={store}
+            live={live}
+            onResume={openLive}
+            onDisconnect={disconnect}
+            onConnect={connect}
+            onEdit={h => setRoute({ name: 'editHost', host: h })}
+          />,
+        ),
+        sessions: pane(
+          'sessions',
+          <SessionsScreen
+            live={live}
+            onResume={openLive}
+            onDisconnect={s => Ssh.disconnect(s.sessionId).catch(() => {})}
+            onRefresh={refreshLive}
+          />,
+        ),
+        identities: pane(
+          'identities',
+          <IdentitiesScreen
+            store={store}
+            onKeys={() => {
+              setTab('keys');
+              setVisitedTabs(v => new Set(v).add('keys'));
+            }}
+          />,
+        ),
+        keys: pane(
+          'keys',
+          <KeysScreen store={store} onBack={() => setTab('hosts')} embedded />,
+        ),
+      }}
+    />
   );
 
   let screen: React.ReactNode = null;
@@ -359,7 +358,9 @@ export default function App() {
       );
       break;
     case 'keybar':
-      screen = <KeyBarEditorScreen onBack={() => setRoute({ name: 'settings' })} />;
+      screen = (
+        <KeyBarEditorScreen onBack={() => setRoute({ name: 'settings' })} />
+      );
       break;
     case 'licenses':
       screen = <LicensesScreen onBack={() => setRoute({ name: 'settings' })} />;
