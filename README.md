@@ -11,7 +11,8 @@ phone: securely stored keys, end-to-end encrypted sync across devices, and a
 custom terminal key bar with a dedicated layer for AI coding CLIs
 (Claude Code and similar).
 
-> Status: early alpha. Works daily on Android; no published release yet.
+> Status: early alpha. Works daily on Android. Download the signed APK from
+> [Releases](https://github.com/Citters-Technologies/lulossh/releases/latest).
 
 ## Why LuloSSH exists
 

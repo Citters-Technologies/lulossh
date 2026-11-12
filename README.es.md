@@ -11,7 +11,8 @@ desde el móvil: claves guardadas de forma segura, sincronización cifrada entre
 dispositivos y una barra de teclas propia, con una capa para CLIs de IA
 (Claude Code y similares).
 
-> Estado: alfa temprana. Se usa a diario en Android; aún sin versión publicada.
+> Estado: alfa temprana. Se usa a diario en Android. Descarga el APK firmado desde
+> [Releases](https://github.com/Citters-Technologies/lulossh/releases/latest).
 
 ## Por qué existe LuloSSH
 
