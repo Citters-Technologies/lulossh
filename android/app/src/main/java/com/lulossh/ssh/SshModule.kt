@@ -148,6 +148,12 @@ class SshModule(private val rc: ReactApplicationContext) : ReactContextBaseJavaM
     }
 
     @ReactMethod
+    fun ensureKeyboardFocus() {
+        val activity = rc.currentActivity ?: return
+        activity.runOnUiThread { TerminalInput.ensureFocus(activity) }
+    }
+
+    @ReactMethod
     fun hideKeyboard(detach: Boolean) {
         val activity = rc.currentActivity ?: return
         activity.runOnUiThread {

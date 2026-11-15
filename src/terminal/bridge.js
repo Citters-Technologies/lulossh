@@ -74,6 +74,12 @@
   // sugerencias, que rompen los comandos.
   var ta = term.textarea;
   if (ta) {
+    // Con teclado nativo, el textarea de xterm no debe tener nunca el foco:
+    // si lo coge, el IME escribe en él y el retroceso con el campo vacío
+    // se pierde (fallo conocido de Android). La entrada va por la vista nativa.
+    ta.addEventListener('focus', function () {
+      if (nativeKeyboard) ta.blur();
+    });
     ta.setAttribute('autocapitalize', 'none');
     ta.setAttribute('autocorrect', 'off');
     ta.setAttribute('autocomplete', 'off');
@@ -184,14 +190,116 @@
     return line ? line.translateToString(false) : '';
   }
 
+  // ---- Selección con tiradores ----------------------------------------------
+  // selA = extremo fijo, selB = extremo que se mueve (coordenadas absolutas
+  // del buffer). Tras seleccionar se muestran dos tiradores, en el inicio y en
+  // el fin, que se arrastran para ajustar la selección.
+  var selA = null;
+  var selB = null;
+
+  function before(a, b) {
+    return a.row < b.row || (a.row === b.row && a.col < b.col);
+  }
+
+  function ordered() {
+    return before(selB, selA) ? { s: selB, e: selA } : { s: selA, e: selB };
+  }
+
   function selectRange(a, b) {
-    var s = a, e = b;
-    if (b.row < a.row || (b.row === a.row && b.col < a.col)) {
-      s = b;
-      e = a;
+    selA = a;
+    selB = b;
+    var o = ordered();
+    var len = (o.e.row - o.s.row) * term.cols + (o.e.col - o.s.col) + 1;
+    term.select(o.s.col, o.s.row, len);
+    drawHandles();
+  }
+
+  function makeHandle(cls) {
+    var h = document.createElement('div');
+    h.className = 'lulo-handle ' + cls;
+    (screenEl || term.element).appendChild(h);
+    return h;
+  }
+  var hStart = makeHandle('lulo-handle-start');
+  var hEnd = makeHandle('lulo-handle-end');
+  var HANDLE_PX = 22;
+
+  function hideHandles() {
+    hStart.style.display = 'none';
+    hEnd.style.display = 'none';
+  }
+
+  /** Coloca un tirador bajo la celda (col,row); oculto si no está en pantalla. */
+  function placeHandle(h, col, row, right) {
+    var sc = term.element.querySelector('.xterm-screen');
+    if (!sc) return;
+    var r = sc.getBoundingClientRect();
+    var cw = r.width / term.cols;
+    var ch = r.height / term.rows;
+    var screenRow = row - term.buffer.active.viewportY;
+    if (screenRow < 0 || screenRow >= term.rows) {
+      h.style.display = 'none';
+      return;
     }
-    var len = (e.row - s.row) * term.cols + (e.col - s.col) + 1;
-    term.select(s.col, s.row, len);
+    var x = (right ? col + 1 : col) * cw - (right ? 0 : HANDLE_PX);
+    var y = (screenRow + 1) * ch;
+    h.style.display = 'block';
+    h.style.transform = 'translate(' + x + 'px,' + y + 'px)';
+  }
+
+  function drawHandles() {
+    if (!selA || !selB || !term.hasSelection()) {
+      hideHandles();
+      return;
+    }
+    var o = ordered();
+    placeHandle(hStart, o.s.col, o.s.row, false);
+    placeHandle(hEnd, o.e.col, o.e.row, true);
+  }
+  term.onRender(drawHandles);
+  term.onScroll(drawHandles);
+  term.onSelectionChange(function () {
+    if (!term.hasSelection()) {
+      selA = selB = null;
+      hideHandles();
+    }
+  });
+
+  /** ¿El dedo está sobre un tirador visible? Devuelve 'start' | 'end' | null. */
+  function hitHandle(x, y) {
+    var best = null;
+    var bestD = 36; // radio de toque generoso: los tiradores son pequeños
+    [
+      ['start', hStart],
+      ['end', hEnd],
+    ].forEach(function (p) {
+      if (p[1].style.display !== 'block') return;
+      var r = p[1].getBoundingClientRect();
+      var d = Math.hypot(x - (r.left + r.width / 2), y - (r.top + r.height / 2));
+      if (d < bestD) {
+        bestD = d;
+        best = p[0];
+      }
+    });
+    return best;
+  }
+
+  /** Desplaza al arrastrar un tirador cerca del borde (solo buffer normal). */
+  var edgeScrollAt = 0;
+  function edgeScroll(y) {
+    if (term.buffer.active.type !== 'normal') return;
+    var now = performance.now();
+    if (now - edgeScrollAt < 80) return;
+    var sc = term.element.querySelector('.xterm-screen');
+    var r = sc.getBoundingClientRect();
+    var ch = r.height / term.rows;
+    if (y < r.top + ch) {
+      term.scrollLines(-1);
+      edgeScrollAt = now;
+    } else if (y > r.bottom - ch) {
+      term.scrollLines(1);
+      edgeScrollAt = now;
+    }
   }
 
   /** Palabra bajo el dedo (caracteres no blancos); devuelve sus extremos. */
@@ -209,6 +317,11 @@
     return { start: { col: s, row: c.row }, end: { col: e, row: c.row } };
   }
 
+  // Nada de menús ni selección nativa del WebView: los gestos son nuestros.
+  document.addEventListener('contextmenu', function (ev) {
+    ev.preventDefault();
+  });
+
   el.addEventListener(
     'touchstart',
     function (ev) {
@@ -216,8 +329,20 @@
         touch = null;
         return;
       }
+      // Sin esto Android da el foco al WebView (y el teclado acaba escribiendo
+      // en él) y lanza su propia selección de texto con otro menú.
+      ev.preventDefault();
       stopFling();
       var t = ev.touches[0];
+      var handle = hitHandle(t.clientX, t.clientY);
+      if (handle) {
+        var o = ordered();
+        // El extremo contrario queda fijo; se mueve el que se arrastra.
+        selA = handle === 'start' ? o.e : o.s;
+        selB = handle === 'start' ? o.s : o.e;
+        touch = { handle: handle, x: t.clientX, y: t.clientY, moved: true };
+        return;
+      }
       touch = {
         x: t.clientX,
         y: t.clientY,
@@ -232,12 +357,11 @@
         if (!touch || touch.moved) return;
         touch.selecting = true;
         var w = wordAt(cellAt(touch.x, touch.y));
-        touch.anchor = w.start;
         selectRange(w.start, w.end);
         if (navigator.vibrate) navigator.vibrate(15);
       }, LONG_MS);
     },
-    { passive: true },
+    { passive: false },
   );
 
   el.addEventListener(
@@ -245,9 +369,19 @@
     function (ev) {
       if (!touch) return;
       var t = ev.touches[0];
+      ev.preventDefault();
+      if (touch.handle) {
+        // El tirador está bajo la línea: apuntar a la línea de encima del dedo
+        // para que el dedo no tape lo que se selecciona.
+        var sc = term.element.querySelector('.xterm-screen');
+        var ch = sc.getBoundingClientRect().height / term.rows;
+        edgeScroll(t.clientY);
+        selectRange(selA, cellAt(t.clientX, t.clientY - ch));
+        return;
+      }
       if (touch.selecting) {
-        ev.preventDefault(); // no desplazar mientras se selecciona
-        selectRange(touch.anchor, cellAt(t.clientX, t.clientY));
+        edgeScroll(t.clientY);
+        selectRange(selA, cellAt(t.clientX, t.clientY));
         return;
       }
       if (
@@ -260,7 +394,6 @@
         clearTimeout(touch.timer);
       }
       if (touch.moved && touch.vertical) {
-        ev.preventDefault();
         scrollPx(touch.lastY - t.clientY);
         touch.lastY = t.clientY;
         var now = performance.now();
@@ -278,8 +411,8 @@
     clearTimeout(touch.timer);
     var t = touch;
     touch = null;
-    if (t.selecting) {
-      ev.preventDefault();
+    ev.preventDefault();
+    if (t.selecting || t.handle) {
       post({ type: 'selection', text: term.getSelection() });
       return;
     }
@@ -312,11 +445,18 @@
     touch = null;
   });
 
+  var lastFit = '';
   function doFit() {
     try {
       fit.fit();
-      post({ type: 'resize', cols: term.cols, rows: term.rows });
+      // Solo avisar si de verdad cambió (ResizeObserver dispara de más).
+      var key = term.cols + 'x' + term.rows;
+      if (key !== lastFit) {
+        lastFit = key;
+        post({ type: 'resize', cols: term.cols, rows: term.rows });
+      }
       drawCursor();
+      drawHandles();
     } catch (e) {}
   }
 
@@ -332,6 +472,21 @@
       var bytes = new Uint8Array(bin.length);
       for (var i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
       term.write(bytes);
+    },
+    /**
+     * Repinta el historial de una sesión restaurada sin que se vea desfilar:
+     * se escribe oculto y se muestra ya al final.
+     */
+    replay: function (b64) {
+      var bin = atob(b64);
+      var bytes = new Uint8Array(bin.length);
+      for (var i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+      el.style.visibility = 'hidden';
+      term.write(bytes, function () {
+        term.scrollToBottom();
+        el.style.visibility = '';
+        drawCursor();
+      });
     },
     setFontSize: function (n) {
       term.options.fontSize = n;

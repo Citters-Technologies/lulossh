@@ -57,6 +57,16 @@ html,body{margin:0;padding:0;height:100%;background:#0b0f14;overflow:hidden}
   box-sizing:border-box;border:2px solid var(--lulo-cursor);border-radius:1px;
   background:transparent;will-change:transform;
 }
+/* Sin selección ni menú nativos del WebView: la selección es la de xterm. */
+html,body,#term{-webkit-user-select:none;user-select:none;-webkit-touch-callout:none}
+/* Tiradores de selección (gota azul bajo el inicio y el fin). */
+.lulo-handle{
+  position:absolute;top:0;left:0;z-index:6;display:none;pointer-events:none;
+  width:22px;height:22px;background:#3b82f6;will-change:transform;
+  box-shadow:0 1px 3px rgba(0,0,0,.4);
+}
+.lulo-handle-start{border-radius:50% 0 50% 50%}
+.lulo-handle-end{border-radius:0 50% 50% 50%}
 </style></head>
 <body><div id="term"></div>
 <script>${safe(xtermJs)}</script>

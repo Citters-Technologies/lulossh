@@ -126,6 +126,19 @@ object TerminalInput {
         imm.showSoftInput(v, InputMethodManager.SHOW_IMPLICIT)
     }
 
+    /**
+     * Si el foco se lo ha llevado otra vista (p. ej. el WebView al tocar la
+     * consola), devolverlo a la nuestra. Sin esto, el teclado acaba escribiendo
+     * en el WebView, donde el retroceso con el campo vacío se pierde.
+     */
+    fun ensureFocus(activity: Activity) {
+        val v = view ?: return
+        if (v.hasFocus()) return
+        v.requestFocus()
+        val imm = activity.getSystemService(Context.INPUT_METHOD_SERVICE) as InputMethodManager
+        imm.restartInput(v)
+    }
+
     fun hide(activity: Activity) {
         val v = view ?: return
         val imm = activity.getSystemService(Context.INPUT_METHOD_SERVICE) as InputMethodManager

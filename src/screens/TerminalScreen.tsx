@@ -90,6 +90,7 @@ export function TerminalScreen({
     // keyboardHeight puede quedar desfasado tras apagar la pantalla.
     if (keyboardHeight > 0 && Keyboard.isVisible()) {
       setBarVisible(v => !v);
+      Ssh.ensureKeyboardFocus();
     } else {
       setBarVisible(true);
       Ssh.showKeyboard();
@@ -312,15 +313,17 @@ export function TerminalScreen({
       })
       .catch(() => {});
 
-  const resume = async (size: { cols: number; rows: number }) => {
+  const resume = async () => {
     try {
       const history = await Ssh.attach(sessionId.current);
       if (history) {
-        term.current?.write(history);
+        term.current?.replay(history);
       }
       connected.current = true;
       setStatus('Conectado');
-      Ssh.resize(sessionId.current, size.cols, size.rows).catch(() => {});
+      // La sesión pudo quedarse con otro tamaño en segundo plano.
+      sentSize.current = '';
+      onResize(lastSize.current);
       // Al volver a una sesión, directamente con el teclado listo.
       setBarVisible(true);
       term.current?.focus();
@@ -374,7 +377,7 @@ export function TerminalScreen({
       term.current?.setFontSize(fontSize.current);
     }
     if (resumeSession) {
-      await resume(size);
+      await resume();
     } else {
       await connect(size);
     }
@@ -399,6 +402,9 @@ export function TerminalScreen({
       );
       connected.current = true;
       setStatus('Conectado');
+      // Se conectó con `size`; si cambió mientras tanto, enviar el actual.
+      sentSize.current = `${size.cols}x${size.rows}`;
+      onResize(lastSize.current);
       term.current?.focus();
       // ¿Hay CLIs de IA en el destino? (canal aparte, no se ve en la terminal)
       probeAiTools();
@@ -411,11 +417,33 @@ export function TerminalScreen({
     }
   };
 
+  // Al abrir/cerrar el teclado el tamaño cambia varias veces durante la
+  // animación. Cada cambio que llega al servidor hace que apps como Claude
+  // Code repinten toda la pantalla, así que solo se envía el tamaño final
+  // (estable unos 250 ms) y solo si es distinto del último enviado.
+  const sentSize = useRef('');
+  const resizeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(
+    () => () => {
+      if (resizeTimer.current) {
+        clearTimeout(resizeTimer.current);
+      }
+    },
+    [],
+  );
   const onResize = (size: { cols: number; rows: number }) => {
     lastSize.current = size;
-    if (connected.current) {
-      Ssh.resize(sessionId.current, size.cols, size.rows).catch(() => {});
+    if (resizeTimer.current) {
+      clearTimeout(resizeTimer.current);
     }
+    resizeTimer.current = setTimeout(() => {
+      resizeTimer.current = null;
+      const key = `${size.cols}x${size.rows}`;
+      if (connected.current && key !== sentSize.current) {
+        sentSize.current = key;
+        Ssh.resize(sessionId.current, size.cols, size.rows).catch(() => {});
+      }
+    }, 250);
   };
 
   return (

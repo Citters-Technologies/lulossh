@@ -101,6 +101,8 @@ export interface SshModuleSpec {
    */
   showKeyboard(): void;
   hideKeyboard(detach: boolean): void;
+  /** Devuelve el foco del teclado a la vista de entrada si otra lo robó. */
+  ensureKeyboardFocus(): void;
 
   /** Teclas de volumen -> evento "volumeKey" {direction: 'up'|'down'}. */
   setVolumeKeysEnabled(enabled: boolean): void;

@@ -24,6 +24,8 @@ const NATIVE_KEYBOARD = Platform.OS === 'android';
 export interface TerminalHandle {
   /** Escribe bytes (base64) que llegan del host. */
   write(base64: string): void;
+  /** Historial de una sesión restaurada: se pinta oculto y se muestra al final. */
+  replay(base64: string): void;
   focus(): void;
   clear(): void;
   clearSelection(): void;
@@ -56,6 +58,7 @@ export const TerminalView = forwardRef<TerminalHandle, Props>(
     useImperativeHandle(ref, () => ({
       // base64 solo contiene [A-Za-z0-9+/=], es seguro dentro de comillas.
       write: b64 => run(`window.lulo.write("${b64}")`),
+      replay: b64 => run(`window.lulo.replay("${b64}")`),
       focus: () => run('window.lulo.focus()'),
       clear: () => run('window.lulo.clear()'),
       clearSelection: () => run('window.lulo.clearSelection()'),
