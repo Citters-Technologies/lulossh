@@ -151,6 +151,8 @@ export default function App() {
     const sub = AppState.addEventListener('change', s => {
       if (s === 'active') {
         checkPendingOpen();
+        // Tras segundo plano la conexión pudo morir sin avisar.
+        Ssh.probeSessions();
       }
     });
     return () => sub.remove();

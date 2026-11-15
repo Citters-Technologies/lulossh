@@ -33,6 +33,9 @@ class SshModule(private val rc: ReactApplicationContext) : ReactContextBaseJavaM
     ) {
         /** Últimos bytes de salida, para restaurar la pantalla al volver. */
         val history = ByteRing(HISTORY_BYTES)
+
+        /** Motivo si la cerramos nosotros por estar muerta (sondeo fallido). */
+        @Volatile var deadReason: String? = null
     }
 
     /** Buffer circular de bytes (thread-safe). */
@@ -489,6 +492,63 @@ class SshModule(private val rc: ReactApplicationContext) : ReactContextBaseJavaM
         const val CONNECT_TIMEOUT_MS = 15_000
         const val HOSTKEY_WAIT_MS = 120_000
         const val HISTORY_BYTES = 256 * 1024
+        const val PROBE_TIMEOUT_S = 6L
+    }
+
+    /**
+     * Comprueba que cada sesión sigue viva con un keepalive SSH. Tras cambiar
+     * de red o volver de segundo plano el socket puede estar muerto sin dar
+     * error; si no responde en unos segundos se cierra y JS lo muestra como
+     * conexión perdida (con opción de reconectar) en vez de un falso "Conectado".
+     */
+    @ReactMethod
+    fun probeSessions() {
+        sessions.forEach { (id, s) -> pool.execute { probe(id, s) } }
+    }
+
+    private fun probe(id: String, s: Sess) {
+        val alive = try {
+            s.client.connection
+                .sendGlobalRequest("keepalive@openssh.com", true, ByteArray(0))
+                .retrieve(PROBE_TIMEOUT_S, TimeUnit.SECONDS)
+            true
+        } catch (e: Exception) {
+            // Una respuesta de "petición no soportada" también prueba que vive;
+            // lo que cuenta como muerta es el timeout o un transporte caído.
+            val timeout = e.cause is java.util.concurrent.TimeoutException ||
+                e.message?.contains("timeout", ignoreCase = true) == true
+            !timeout && e !is net.schmizz.sshj.transport.TransportException && s.client.isConnected
+        }
+        if (!alive && sessions[id] === s) {
+            s.deadReason = "sin respuesta del servidor (cambio de red o sin cobertura)"
+            try { s.client.disconnect() } catch (_: Exception) {}
+        }
+    }
+
+    // Al cambiar la red por defecto (wifi <-> datos) los sockets de la red
+    // anterior quedan muertos: sondear enseguida en vez de esperar al keepalive.
+    private val netCallback = object : android.net.ConnectivityManager.NetworkCallback() {
+        @Volatile private var last: android.net.Network? = null
+        override fun onAvailable(network: android.net.Network) {
+            val prev = last
+            last = network
+            if (prev != null && prev != network && sessions.isNotEmpty()) probeSessions()
+        }
+    }
+
+    init {
+        try {
+            rc.getSystemService(android.net.ConnectivityManager::class.java)
+                ?.registerDefaultNetworkCallback(netCallback)
+        } catch (_: Exception) {}
+    }
+
+    override fun invalidate() {
+        try {
+            rc.getSystemService(android.net.ConnectivityManager::class.java)
+                ?.unregisterNetworkCallback(netCallback)
+        } catch (_: Exception) {}
+        super.invalidate()
     }
 
     private fun pump(id: String, sess: Sess) {
@@ -498,7 +558,11 @@ class SshModule(private val rc: ReactApplicationContext) : ReactContextBaseJavaM
                 val input = sess.shell.inputStream
                 while (true) {
                     val n = input.read(buf)
-                    if (n < 0) break
+                    if (n < 0) {
+                        // Si la cortó el sondeo, no es un "exit" limpio.
+                        sess.deadReason?.let { throw java.io.IOException(it) }
+                        break
+                    }
                     sess.history.append(buf, n)
                     emit("data", Arguments.createMap().apply {
                         putString("sessionId", id)
@@ -508,7 +572,7 @@ class SshModule(private val rc: ReactApplicationContext) : ReactContextBaseJavaM
                 emit("closed", Arguments.createMap().apply { putString("sessionId", id) })
             } catch (e: Exception) {
                 emit("closed", Arguments.createMap().apply {
-                    putString("sessionId", id); putString("reason", e.message)
+                    putString("sessionId", id); putString("reason", sess.deadReason ?: e.message)
                 })
             } finally {
                 closeSession(id)
