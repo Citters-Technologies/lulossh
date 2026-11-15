@@ -1,0 +1,36 @@
+name: iOS build
+
+# Compila la app de iOS en un Mac de GitHub (no hace falta Mac propio).
+# De momento: build de simulador sin firmar, para verificar que compila.
+on:
+  push:
+    branches: [main]
+    paths: ['ios/**', 'src/**', 'App.tsx', 'package*.json', '.github/workflows/ios.yml']
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: macos-15
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: '3.3'
+          bundler-cache: true
+      - name: Pods
+        working-directory: ios
+        run: bundle exec pod install
+      - name: Build (simulador)
+        working-directory: ios
+        run: |
+          set -o pipefail
+          xcodebuild -workspace LuloSSH.xcworkspace -scheme LuloSSH \
+            -configuration Release -sdk iphonesimulator \
+            -destination 'generic/platform=iOS Simulator' \
+            CODE_SIGNING_ALLOWED=NO build | tail -n 200
