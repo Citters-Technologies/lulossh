@@ -3,7 +3,7 @@ import { NativeEventEmitter, NativeModules } from 'react-native';
 /**
  * Contrato único del módulo SSH. Cada plataforma lo implementa en nativo:
  *  - Android: Kotlin + sshj (android/app/src/main/java/com/lulossh/ssh)
- *  - iOS: Swift (pendiente) con la misma API.
+ *  - iOS: Swift + Citadel (ios/LuloSSH/LuloSsh.swift) con la misma API.
  * La UI solo depende de este fichero, así que es portable.
  */
 
