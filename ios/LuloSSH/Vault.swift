@@ -19,8 +19,11 @@ struct VaultError: LocalizedError {
 final class Vault {
   static let authWindow: TimeInterval = 300
   private let service = "com.citters.lulossh.vault"
-  private let lock = NSLock()
-  private var unlockedUntil = Date.distantPast
+  // Estáticos: la recarga de JS (cambio de tema) crea un módulo nuevo y no
+  // debe volver a pedir Face ID, igual que en Android (ventana del Keystore).
+  private static let lock = NSLock()
+  private static var unlockedUntil = Date.distantPast
+  private var lock: NSLock { Vault.lock }
 
   static func privateKeyName(_ id: String) -> String { "key:\(id)" }
   static func passphraseName(_ id: String) -> String { "keypass:\(id)" }
@@ -38,7 +41,7 @@ final class Vault {
     ctx.evaluatePolicy(.deviceOwnerAuthentication, localizedReason: reason) { ok, e in
       if ok {
         self.lock.lock()
-        self.unlockedUntil = Date().addingTimeInterval(Vault.authWindow)
+        Vault.unlockedUntil = Date().addingTimeInterval(Vault.authWindow)
         self.lock.unlock()
         done(nil)
       } else {
@@ -50,7 +53,7 @@ final class Vault {
   private func ensureUnlocked() throws {
     lock.lock()
     defer { lock.unlock() }
-    if Date() > unlockedUntil { throw VaultLocked() }
+    if Date() > Vault.unlockedUntil { throw VaultLocked() }
   }
 
   private func baseQuery(_ name: String) -> [String: Any] {
