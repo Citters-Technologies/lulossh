@@ -140,6 +140,17 @@ export interface SshModuleSpec {
     password: string,
     fileName: string,
   ): Promise<SavedFile | null>;
+  /**
+   * Cifra el documento de sincronización (JSON) con la contraseña de
+   * sincronización; nativo añade antes los secretos de `keyIds` desde el
+   * vault. Devuelve el contenido cifrado. Falla con 'LOCKED' si el vault
+   * está bloqueado.
+   */
+  sealSync(
+    docJson: string,
+    keyIds: string[],
+    password: string,
+  ): Promise<string>;
   /** Descifra una copia (falla con code 'BAD_PASSWORD'). Devuelve JSON. */
   decryptBackup(content: string, password: string): Promise<string>;
 

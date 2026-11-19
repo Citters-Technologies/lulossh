@@ -17,14 +17,18 @@ import { renameFolder } from './folders';
 import { Ssh } from '../native/SshModule';
 import { Host, Identity, resolveHost, SshKey } from './models';
 import { newId, readJson, withUnlock, writeJson } from './vault';
+import { stampChanges, SyncKind, Tombstone } from '../sync/merge';
 
 const HOSTS = 'hosts';
 const KEYS = 'keys';
 const IDENTITIES = 'identities';
+/** Borrados recientes (para que la sincronización no los resucite). */
+const TOMBSTONES = 'syncTombstones';
 
 /**
- * Estado de hosts y claves, persistido cifrado en el vault.
- * (Más adelante, la sync de Drive exportará estos mismos datos cifrados.)
+ * Estado de hosts, identidades y claves, persistido cifrado en el vault.
+ * Cada cambio queda fechado (updatedAt) y cada borrado deja una lápida: es
+ * lo que usa la sincronización cifrada entre dispositivos (src/sync).
  */
 /** `enabled`: no leer el vault hasta que la app esté desbloqueada. */
 export function useStore(enabled = true) {
@@ -32,18 +36,25 @@ export function useStore(enabled = true) {
   const hostsRef = useRef<Host[]>([]);
   const [keys, setKeys] = useState<SshKey[]>([]);
   const [identities, setIdentities] = useState<Identity[]>([]);
+  const keysRef = useRef<SshKey[]>([]);
+  const identitiesRef = useRef<Identity[]>([]);
+  const tombstonesRef = useRef<Tombstone[]>([]);
   const [loaded, setLoaded] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     try {
       setError(null);
-      const [h, k, i] = [
+      const [h, k, i, t] = [
         await readJson<Host[]>(HOSTS, []),
         await readJson<SshKey[]>(KEYS, []),
         await readJson<Identity[]>(IDENTITIES, []),
+        await readJson<Tombstone[]>(TOMBSTONES, []),
       ];
       hostsRef.current = h;
+      keysRef.current = k;
+      identitiesRef.current = i;
+      tombstonesRef.current = t;
       setHosts(h);
       setKeys(k);
       setIdentities(i);
@@ -63,20 +74,39 @@ export function useStore(enabled = true) {
 
   // Última lista conocida: los parches seguidos (huella, SO, uso) no se pisan.
   // (Solo se actualiza al cargar y al guardar, nunca desde el render.)
+  /** Fecha lo cambiado respecto a `prev` y apunta lo borrado. */
+  const stamp = async <T extends { id: string; updatedAt?: number }>(
+    kind: SyncKind,
+    prev: T[],
+    next: T[],
+  ): Promise<T[]> => {
+    const { items, deleted } = stampChanges(kind, prev, next, Date.now());
+    if (deleted.length) {
+      tombstonesRef.current = [...tombstonesRef.current, ...deleted];
+      await writeJson(TOMBSTONES, tombstonesRef.current);
+    }
+    return items;
+  };
+
   const saveHosts = async (next: Host[]) => {
-    hostsRef.current = next;
-    await writeJson(HOSTS, next);
-    setHosts(next);
+    const items = await stamp('host', hostsRef.current, next);
+    hostsRef.current = items;
+    await writeJson(HOSTS, items);
+    setHosts(items);
   };
 
   const saveKeys = async (next: SshKey[]) => {
-    await writeJson(KEYS, next);
-    setKeys(next);
+    const items = await stamp('key', keysRef.current, next);
+    keysRef.current = items;
+    await writeJson(KEYS, items);
+    setKeys(items);
   };
 
   const saveIdentities = async (next: Identity[]) => {
-    await writeJson(IDENTITIES, next);
-    setIdentities(next);
+    const items = await stamp('identity', identitiesRef.current, next);
+    identitiesRef.current = items;
+    await writeJson(IDENTITIES, items);
+    setIdentities(items);
   };
 
   return {
@@ -146,7 +176,8 @@ export function useStore(enabled = true) {
       );
     },
 
-    deleteHost: (id: string) => saveHosts(hostsRef.current.filter(h => h.id !== id)),
+    deleteHost: (id: string) =>
+      saveHosts(hostsRef.current.filter(h => h.id !== id)),
 
     deleteHosts: (ids: string[]) => {
       const gone = new Set(ids);
@@ -203,7 +234,9 @@ export function useStore(enabled = true) {
           known.add(k.name.toLowerCase());
         } catch (e: any) {
           report.push(
-            `Clave ${k.name}: ${e?.message ?? e} (si tiene passphrase, impórtala desde Claves)`,
+            `Clave ${k.name}: ${
+              e?.message ?? e
+            } (si tiene passphrase, impórtala desde Claves)`,
           );
         }
       }
@@ -212,17 +245,24 @@ export function useStore(enabled = true) {
         await saveKeys(allKeys);
       }
 
-      const plan = planImport(hostsRef.current, allKeys, data.hosts, newId, identities);
+      const plan = planImport(
+        hostsRef.current,
+        allKeys,
+        data.hosts,
+        newId,
+        identities,
+      );
       const visible = plan.toUpdate.filter(u => u.changes.length);
-      const apply =
-        visible.length === 0 ? true : await confirmUpdates(visible);
+      const apply = visible.length === 0 ? true : await confirmUpdates(visible);
       const updates = new Map(
         plan.toUpdate
           .filter(u => apply || !u.changes.length)
           .map(u => [u.id, u.patch]),
       );
       const next = [
-        ...hostsRef.current.map(h => (updates.has(h.id) ? { ...h, ...updates.get(h.id) } : h)),
+        ...hostsRef.current.map(h =>
+          updates.has(h.id) ? { ...h, ...updates.get(h.id) } : h,
+        ),
         ...plan.toAdd,
       ];
       if (plan.toAdd.length || updates.size) {
@@ -248,7 +288,11 @@ export function useStore(enabled = true) {
       saveHosts(
         hostsRef.current.map(h =>
           hostIds.includes(h.id)
-            ? { ...h, auth: { type: 'privateKey', keyId }, identityId: undefined }
+            ? {
+                ...h,
+                auth: { type: 'privateKey', keyId },
+                identityId: undefined,
+              }
             : h,
         ),
       ),
@@ -324,6 +368,61 @@ export function useStore(enabled = true) {
         keys: newKeys.length,
         notes,
       };
+    },
+
+    /** Puente con el motor de sincronización (src/sync/engine.ts). */
+    syncTarget: {
+      snapshot: () => ({
+        hosts: hostsRef.current,
+        identities: identitiesRef.current,
+        keys: keysRef.current,
+        tombstones: tombstonesRef.current,
+      }),
+      apply: async (
+        state: {
+          hosts: Host[];
+          identities: Identity[];
+          keys: SshKey[];
+          tombstones: Tombstone[];
+        },
+        secrets: Record<string, { pem: string; passphrase?: string }>,
+      ) => {
+        // Claves: importar al vault las nuevas y quitar las borradas.
+        const had = new Set(keysRef.current.map(k => k.id));
+        const keep = new Set(state.keys.map(k => k.id));
+        const finalKeys: SshKey[] = [];
+        for (const k of state.keys) {
+          if (had.has(k.id)) {
+            finalKeys.push(k);
+            continue;
+          }
+          const sec = secrets[k.id];
+          if (!sec) {
+            continue; // sin su clave privada no sirve de nada
+          }
+          await withUnlock(() =>
+            Ssh.importKey(k.id, sec.pem, sec.passphrase ?? null, k.name),
+          );
+          finalKeys.push(k);
+        }
+        for (const k of keysRef.current) {
+          if (!keep.has(k.id)) {
+            await withUnlock(() => Ssh.deleteKey(k.id)).catch(() => {});
+          }
+        }
+        // Tal cual, sin volver a fechar: las fechas vienen de la fusión.
+        keysRef.current = finalKeys;
+        identitiesRef.current = state.identities;
+        hostsRef.current = state.hosts;
+        tombstonesRef.current = state.tombstones;
+        await writeJson(KEYS, finalKeys);
+        await writeJson(IDENTITIES, state.identities);
+        await writeJson(HOSTS, state.hosts);
+        await writeJson(TOMBSTONES, state.tombstones);
+        setKeys(finalKeys);
+        setIdentities(state.identities);
+        setHosts(state.hosts);
+      },
     },
 
     /** No se puede borrar una clave en uso por algún host o identidad. */

@@ -279,6 +279,36 @@ class SshModule(private val rc: ReactApplicationContext) : ReactContextBaseJavaM
         }
     }
 
+    /**
+     * Cifra el documento de sincronización con la contraseña de
+     * sincronización, añadiendo antes las claves privadas (y passphrases) de
+     * `keyIds` desde el vault: así nunca pasan por JS al subirlas. Devuelve el
+     * contenido cifrado (mismo formato que la copia de seguridad).
+     */
+    @ReactMethod
+    fun sealSync(docJson: String, keyIds: com.facebook.react.bridge.ReadableArray, password: String, promise: Promise) {
+        pool.execute {
+            try {
+                val doc = org.json.JSONObject(docJson)
+                val secrets = org.json.JSONObject()
+                for (i in 0 until keyIds.size()) {
+                    val id = keyIds.getString(i) ?: continue
+                    val pem = vault.get(KeyVault.privateKeyName(id)) ?: continue
+                    secrets.put(id, org.json.JSONObject().apply {
+                        put("pem", pem)
+                        vault.get(KeyVault.passphraseName(id))?.let { put("passphrase", it) }
+                    })
+                }
+                doc.put("secrets", secrets)
+                promise.resolve(Backup.encrypt(doc.toString(), password))
+            } catch (e: VaultLockedException) {
+                promise.reject("LOCKED", "Vault bloqueado", e)
+            } catch (e: Exception) {
+                promise.reject("SYNC_ERROR", e.message, e)
+            }
+        }
+    }
+
     /** Descifra una copia; devuelve el JSON con meta y secrets (claves privadas). */
     @ReactMethod
     fun decryptBackup(content: String, password: String, promise: Promise) {

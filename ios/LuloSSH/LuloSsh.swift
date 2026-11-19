@@ -487,6 +487,11 @@ final class LuloSsh: RCTEventEmitter {
     reject("UNSUPPORTED", "Copia de seguridad aún no disponible en iOS", nil)
   }
 
+  @objc(sealSync:keyIds:password:resolve:reject:)
+  func sealSync(_ docJson: String, keyIds: NSArray, password: String, resolve: RCTPromiseResolveBlock, reject: RCTPromiseRejectBlock) {
+    reject("UNSUPPORTED", "La sincronización aún no está disponible en iOS", nil)
+  }
+
   @objc(decryptBackup:password:resolve:reject:)
   func decryptBackup(_ content: String, password: String, resolve: RCTPromiseResolveBlock, reject: RCTPromiseRejectBlock) {
     reject("UNSUPPORTED", "Copia de seguridad aún no disponible en iOS", nil)

@@ -38,6 +38,8 @@ export interface Host {
   tmux?: boolean;
   /** Nombre de la sesión de tmux (por defecto DEFAULT_TMUX_SESSION). */
   tmuxSession?: string;
+  /** Última edición (ms), para la sincronización entre dispositivos. */
+  updatedAt?: number;
 }
 
 export const DEFAULT_TMUX_SESSION = 'lulossh';
@@ -72,6 +74,8 @@ export interface Identity {
   name: string;
   username: string;
   auth: HostAuth;
+  /** Última edición (ms), para la sincronización. */
+  updatedAt?: number;
 }
 
 /** Host con el usuario y las credenciales efectivas (las de su identidad). */
@@ -86,6 +90,8 @@ export interface SshKey {
   type: string;
   publicKey: string;
   createdAt: number;
+  /** Última edición (ms), para la sincronización. */
+  updatedAt?: number;
 }
 
 export function hostLabel(h: Pick<Host, 'username' | 'host' | 'port'>) {

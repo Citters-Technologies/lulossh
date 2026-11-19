@@ -36,6 +36,7 @@ RCT_EXTERN_METHOD(pickImportFiles:(RCTPromiseResolveBlock)resolve reject:(RCTPro
 RCT_EXTERN_METHOD(isJuiceSshInstalled:(RCTPromiseResolveBlock)resolve reject:(RCTPromiseRejectBlock)reject)
 RCT_EXTERN_METHOD(readJuiceSsh:(RCTPromiseResolveBlock)resolve reject:(RCTPromiseRejectBlock)reject)
 RCT_EXTERN_METHOD(exportBackup:(NSString *)metaJson keyIds:(NSArray *)keyIds password:(NSString *)password fileName:(NSString *)fileName resolve:(RCTPromiseResolveBlock)resolve reject:(RCTPromiseRejectBlock)reject)
+RCT_EXTERN_METHOD(sealSync:(NSString *)docJson keyIds:(NSArray *)keyIds password:(NSString *)password resolve:(RCTPromiseResolveBlock)resolve reject:(RCTPromiseRejectBlock)reject)
 RCT_EXTERN_METHOD(decryptBackup:(NSString *)content password:(NSString *)password resolve:(RCTPromiseResolveBlock)resolve reject:(RCTPromiseRejectBlock)reject)
 RCT_EXTERN_METHOD(decryptXshellPasswords:(NSString *)master blobs:(NSArray *)blobs resolve:(RCTPromiseResolveBlock)resolve reject:(RCTPromiseRejectBlock)reject)
 
