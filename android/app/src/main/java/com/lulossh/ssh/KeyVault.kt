@@ -54,6 +54,19 @@ class KeyVault(context: Context) {
         }
     }
 
+    /**
+     * Cipher del proveedor del Android Keystore. Sin indicarlo, Android puede
+     * elegir BouncyCastle (lo registramos el primero para SSH), que no sabe
+     * usar claves del Keystore (no exportables) y falla con
+     * "Attempt to get length of null array" (visto en Android 17).
+     */
+    private fun keystoreCipher(): Cipher =
+        try {
+            Cipher.getInstance(TRANSFORM, KEYSTORE_CIPHER_PROVIDER)
+        } catch (_: Exception) {
+            Cipher.getInstance(TRANSFORM)
+        }
+
     private inline fun <T> guarded(block: () -> T): T = try {
         block()
     } catch (e: UserNotAuthenticatedException) {
@@ -61,7 +74,7 @@ class KeyVault(context: Context) {
     }
 
     fun put(name: String, value: String) = guarded {
-        val cipher = Cipher.getInstance(TRANSFORM)
+        val cipher = keystoreCipher()
         cipher.init(Cipher.ENCRYPT_MODE, secretKey())
         val blob = cipher.iv + cipher.doFinal(value.toByteArray(Charsets.UTF_8))
         prefs.edit().putString(name, Base64.encodeToString(blob, Base64.NO_WRAP)).apply()
@@ -70,7 +83,7 @@ class KeyVault(context: Context) {
     fun get(name: String): String? = guarded {
         val blob = prefs.getString(name, null)?.let { Base64.decode(it, Base64.NO_WRAP) }
             ?: return@guarded null
-        val cipher = Cipher.getInstance(TRANSFORM)
+        val cipher = keystoreCipher()
         cipher.init(Cipher.DECRYPT_MODE, secretKey(), GCMParameterSpec(128, blob, 0, IV_LEN))
         String(cipher.doFinal(blob, IV_LEN, blob.size - IV_LEN), Charsets.UTF_8)
     }
@@ -83,6 +96,7 @@ class KeyVault(context: Context) {
         const val AUTH_WINDOW_S = 300
         private const val ALIAS = "lulossh_vault_v2"
         private const val TRANSFORM = "AES/GCM/NoPadding"
+        private const val KEYSTORE_CIPHER_PROVIDER = "AndroidKeyStoreBCWorkaround"
         private const val IV_LEN = 12
 
         fun privateKeyName(id: String) = "key:$id"
