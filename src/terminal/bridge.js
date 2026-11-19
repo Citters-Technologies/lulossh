@@ -69,6 +69,17 @@
   term.onResize(drawCursor);
   term.onScroll(drawCursor);
 
+  // Modo "aplicación" de las flechas (vim, htop, less…): las teclas físicas
+  // llegan por la vía nativa, que no lo conoce; se lo decimos a React Native.
+  var lastAppCursor = false;
+  term.onWriteParsed(function () {
+    var on = !!term.modes.applicationCursorKeysMode;
+    if (on !== lastAppCursor) {
+      lastAppCursor = on;
+      post({ type: 'appCursor', on: on });
+    }
+  });
+
   // xterm recibe el teclado por un <textarea> oculto. Sin esto, el teclado de
   // Android lo trata como texto normal: mayúscula inicial, autocorrección y
   // sugerencias, que rompen los comandos.

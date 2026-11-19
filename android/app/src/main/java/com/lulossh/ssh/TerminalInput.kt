@@ -4,6 +4,7 @@ import android.annotation.SuppressLint
 import android.app.Activity
 import android.content.Context
 import android.text.InputType
+import android.view.KeyCharacterMap
 import android.view.KeyEvent
 import android.view.View
 import android.view.ViewGroup
@@ -78,32 +79,90 @@ class TerminalInputView(context: Context, private val onData: (String) -> Unit) 
     override fun onKeyDown(keyCode: Int, event: KeyEvent): Boolean =
         handleKey(event) || super.onKeyDown(keyCode, event)
 
+    /** Acento pendiente de una tecla muerta (´ ` ^ ¨ ~), o 0. */
+    private var pendingAccent = 0
+
+    /**
+     * Traduce una tecla a lo que espera la terminal (como xterm). Los
+     * modificadores en flechas/Inicio/Fin/F1-F12 van como CSI 1;m X, con
+     * m = 1 + Shift(1) + Alt(2) + Ctrl(4).
+     */
     private fun handleKey(event: KeyEvent): Boolean {
+        val mod = 1 + (if (event.isShiftPressed) 1 else 0) +
+            (if (event.isAltPressed) 2 else 0) + (if (event.isCtrlPressed) 4 else 0)
+        fun csiLetter(x: Char) = if (mod == 1) "\u001b[$x" else "\u001b[1;$mod$x"
+        fun csiTilde(n: Int) = if (mod == 1) "\u001b[$n~" else "\u001b[$n;$mod~"
+        fun ss3(x: Char) = if (mod == 1) "\u001bO$x" else "\u001b[1;$mod$x"
         val seq = when (event.keyCode) {
-            KeyEvent.KEYCODE_DEL -> "\u007f"
-            KeyEvent.KEYCODE_FORWARD_DEL -> "\u001b[3~"
+            KeyEvent.KEYCODE_DEL -> if (event.isAltPressed) "\u001b\u007f" else "\u007f"
+            KeyEvent.KEYCODE_FORWARD_DEL -> csiTilde(3)
+            KeyEvent.KEYCODE_INSERT -> csiTilde(2)
             KeyEvent.KEYCODE_ENTER, KeyEvent.KEYCODE_NUMPAD_ENTER -> "\r"
             KeyEvent.KEYCODE_TAB -> if (event.isShiftPressed) "\u001b[Z" else "\t"
             KeyEvent.KEYCODE_ESCAPE -> "\u001b"
-            KeyEvent.KEYCODE_DPAD_UP -> "\u001b[A"
-            KeyEvent.KEYCODE_DPAD_DOWN -> "\u001b[B"
-            KeyEvent.KEYCODE_DPAD_RIGHT -> "\u001b[C"
-            KeyEvent.KEYCODE_DPAD_LEFT -> "\u001b[D"
-            KeyEvent.KEYCODE_MOVE_HOME -> "\u001b[H"
-            KeyEvent.KEYCODE_MOVE_END -> "\u001b[F"
-            KeyEvent.KEYCODE_PAGE_UP -> "\u001b[5~"
-            KeyEvent.KEYCODE_PAGE_DOWN -> "\u001b[6~"
-            else -> {
-                val c = event.getUnicodeChar(event.metaState and KeyEvent.META_CTRL_MASK.inv())
-                if (c == 0) return false
-                var s = String(Character.toChars(c))
-                if (event.isCtrlPressed && c in 0x40..0x7f) s = (c and 0x1f).toChar().toString()
-                if (event.isAltPressed) s = "\u001b$s"
-                s
+            KeyEvent.KEYCODE_DPAD_UP -> csiLetter('A')
+            KeyEvent.KEYCODE_DPAD_DOWN -> csiLetter('B')
+            KeyEvent.KEYCODE_DPAD_RIGHT -> csiLetter('C')
+            KeyEvent.KEYCODE_DPAD_LEFT -> csiLetter('D')
+            KeyEvent.KEYCODE_MOVE_HOME -> csiLetter('H')
+            KeyEvent.KEYCODE_MOVE_END -> csiLetter('F')
+            KeyEvent.KEYCODE_PAGE_UP -> csiTilde(5)
+            KeyEvent.KEYCODE_PAGE_DOWN -> csiTilde(6)
+            KeyEvent.KEYCODE_F1 -> ss3('P')
+            KeyEvent.KEYCODE_F2 -> ss3('Q')
+            KeyEvent.KEYCODE_F3 -> ss3('R')
+            KeyEvent.KEYCODE_F4 -> ss3('S')
+            KeyEvent.KEYCODE_F5 -> csiTilde(15)
+            KeyEvent.KEYCODE_F6 -> csiTilde(17)
+            KeyEvent.KEYCODE_F7 -> csiTilde(18)
+            KeyEvent.KEYCODE_F8 -> csiTilde(19)
+            KeyEvent.KEYCODE_F9 -> csiTilde(20)
+            KeyEvent.KEYCODE_F10 -> csiTilde(21)
+            KeyEvent.KEYCODE_F11 -> csiTilde(23)
+            KeyEvent.KEYCODE_F12 -> csiTilde(24)
+            else -> charFor(event) ?: return false
+        }
+        if (seq.isNotEmpty()) onData(seq)
+        return true
+    }
+
+    /** Carácter de la tecla con Ctrl/Alt y teclas muertas; null si no produce nada. */
+    private fun charFor(event: KeyEvent): String? {
+        // Ctrl+Espacio = NUL (marcar en emacs, prefijos de tmux…).
+        if (event.isCtrlPressed && event.keyCode == KeyEvent.KEYCODE_SPACE) return "\u0000"
+        val c = event.getUnicodeChar(
+            event.metaState and (KeyEvent.META_CTRL_MASK or KeyEvent.META_ALT_MASK).inv(),
+        )
+        if (c == 0) return null
+        if (c and KeyCharacterMap.COMBINING_ACCENT != 0) {
+            // Tecla muerta: esperar a la siguiente (´ + a = á).
+            pendingAccent = c and KeyCharacterMap.COMBINING_ACCENT_MASK
+            return ""
+        }
+        var ch = c
+        if (pendingAccent != 0) {
+            val accent = pendingAccent
+            pendingAccent = 0
+            val composed = KeyCharacterMap.getDeadChar(accent, c)
+            if (composed != 0) {
+                ch = composed
+            } else if (c == ' '.code) {
+                ch = accent // acento + espacio = el acento solo
+            } else {
+                return String(Character.toChars(accent)) + String(Character.toChars(c))
             }
         }
-        onData(seq)
-        return true
+        var s = String(Character.toChars(ch))
+        if (event.isCtrlPressed) {
+            s = when {
+                ch in 0x40..0x7f -> (ch and 0x1f).toChar().toString()
+                ch == '/'.code -> "\u001f"
+                ch in '2'.code..'8'.code -> "\u0000\u001b\u001c\u001d\u001e\u001f\u007f"[ch - '2'.code].toString()
+                else -> s
+            }
+        }
+        if (event.isAltPressed) s = "\u001b$s"
+        return s
     }
 }
 

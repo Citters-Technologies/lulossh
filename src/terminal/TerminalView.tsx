@@ -21,6 +21,15 @@ const WebView = WebViewBase as unknown as React.ComponentType<
 
 const NATIVE_KEYBOARD = Platform.OS === 'android';
 
+/**
+ * Flechas/Inicio/Fin sin modificadores en modo aplicación (DECCKM):
+ * ESC [ A -> ESC O A, como haría xterm.
+ */
+function toAppCursor(data: string): string {
+  // eslint-disable-next-line no-control-regex
+  return data.replace(/^\x1b\[([ABCDHF])$/, '\x1bO$1');
+}
+
 export interface TerminalHandle {
   /** Escribe bytes (base64) que llegan del host. */
   write(base64: string): void;
@@ -73,13 +82,16 @@ export const TerminalView = forwardRef<TerminalHandle, Props>(
     // Android: el teclado lo recibe una vista nativa (sin mayúsculas ni
     // autocorrección en ningún IME), no el textarea del WebView.
     const inputRef = useRef(onInput);
+    const appCursor = useRef(false);
     inputRef.current = onInput;
     useEffect(() => {
       if (!NATIVE_KEYBOARD) {
         return;
       }
       const sub = sshEvents.addListener('termInput', (p: any) =>
-        inputRef.current(p.data),
+        inputRef.current(
+          appCursor.current ? toAppCursor(p.data) : p.data,
+        ),
       );
       return () => {
         sub.remove();
@@ -109,6 +121,8 @@ export const TerminalView = forwardRef<TerminalHandle, Props>(
         onReady({ cols: msg.cols, rows: msg.rows });
       } else if (msg.type === 'resize') {
         onResize({ cols: msg.cols, rows: msg.rows });
+      } else if (msg.type === 'appCursor') {
+        appCursor.current = !!msg.on;
       } else if (msg.type === 'input') {
         onInput(msg.data);
       }
