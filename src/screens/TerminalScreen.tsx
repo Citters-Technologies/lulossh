@@ -29,7 +29,11 @@ import {
   TERM_THEME_PREF,
   themeById,
 } from '../terminal/themes';
-import { DEFAULT_FONT, TERM_FONT_PREF } from '../terminal/font';
+import {
+  DEFAULT_FONT,
+  TERM_FONT_PREF,
+  TERM_RENDERER_PREF,
+} from '../terminal/font';
 import { colors } from '../ui/kit';
 import { useKeyboardHeight } from '../ui/useKeyboardHeight';
 
@@ -39,6 +43,9 @@ const FONT_PREF = 'terminalFontSize';
 const FONT_MIN = 8;
 const FONT_MAX = 32;
 const FONT_DEFAULT = 14;
+
+/** Máximo (en base64) que se acumula en pausa antes de repintar del historial. */
+const PAUSE_BUFFER_MAX = 1_500_000;
 
 /** Última preferencia de botonera visible/oculta (se comparte entre terminales). */
 let lastBarVisible = true;
@@ -55,6 +62,7 @@ export function TerminalScreen({
   active = true,
   onActivate,
   keyboardPad = true,
+  visible = true,
 }: {
   host: Host;
   /**
@@ -83,6 +91,11 @@ export function TerminalScreen({
   onActivate?(): void;
   /** false: el hueco del teclado lo deja el contenedor (varias terminales). */
   keyboardPad?: boolean;
+  /**
+   * false: no se ve (panel que no cabe, Ajustes encima…). No se dibuja: la
+   * salida se acumula y se pinta de golpe al volver (ahorra CPU y batería).
+   */
+  visible?: boolean;
 }) {
   const activeRef = useRef(active);
   activeRef.current = active;
@@ -312,6 +325,34 @@ export function TerminalScreen({
     ]);
   };
 
+  // Pausa del dibujo: oculta o con la app en segundo plano.
+  const [appActive, setAppActive] = useState(
+    AppState.currentState === 'active',
+  );
+  const paused = !visible || !appActive;
+  const pausedRef = useRef(paused);
+  pausedRef.current = paused;
+  const pending = useRef<string[]>([]);
+  const pendingLen = useRef(0);
+  const needResync = useRef(false);
+  useEffect(() => {
+    if (paused) {
+      return;
+    }
+    if (needResync.current) {
+      needResync.current = false;
+      replaying.current = true;
+      Ssh.attach(sessionId.current)
+        .then(h => term.current?.resync(h))
+        .catch(() => {})
+        .finally(() => (replaying.current = false));
+    } else if (pending.current.length) {
+      term.current?.writeBatch(pending.current);
+    }
+    pending.current = [];
+    pendingLen.current = 0;
+  }, [paused]);
+
   // Mientras se repinta el historial de una sesión restaurada, los datos
   // nuevos ya vienen incluidos en él.
   const replaying = useRef(resumeSession);
@@ -323,9 +364,23 @@ export function TerminalScreen({
       return;
     }
     if (event === 'data') {
-      if (!replaying.current) {
-        term.current?.write(p.base64);
+      if (replaying.current) {
+        return;
       }
+      if (pausedRef.current) {
+        if (!needResync.current) {
+          pending.current.push(p.base64);
+          pendingLen.current += p.base64.length;
+          if (pendingLen.current > PAUSE_BUFFER_MAX) {
+            // Demasiado: al volver se repinta desde el historial.
+            pending.current = [];
+            pendingLen.current = 0;
+            needResync.current = true;
+          }
+        }
+        return;
+      }
+      term.current?.write(p.base64);
     } else if (event === 'closed') {
       const wasConnected = connected.current;
       connected.current = false;
@@ -412,7 +467,6 @@ export function TerminalScreen({
       sentSize.current = '';
       onResize(lastSize.current);
       // Al volver a una sesión, directamente con el teclado listo.
-      setBarVisible(true);
       term.current?.focus();
       probeAiTools();
     } catch (e: any) {
@@ -439,7 +493,13 @@ export function TerminalScreen({
   // Al volver a primer plano, si el teclado estaba en uso, reengancharlo.
   useEffect(() => {
     const sub = AppState.addEventListener('change', s => {
-      if (s === 'active' && connected.current && barVisible) {
+      setAppActive(s === 'active');
+      if (
+        s === 'active' &&
+        connected.current &&
+        barVisible &&
+        activeRef.current
+      ) {
         Ssh.hideKeyboard(true); // vista de entrada nueva: IME limpio
       }
     });
@@ -452,6 +512,10 @@ export function TerminalScreen({
       return; // el WebView puede recargarse; no reconectar en silencio
     }
     started.current = true;
+    const renderer = await Ssh.prefGet(TERM_RENDERER_PREF).catch(() => null);
+    if (renderer === 'dom') {
+      term.current?.setRenderer('dom');
+    }
     // El WebView ya cargó: aplicar el tema y el tamaño guardados.
     const themeId = await Ssh.prefGet(TERM_THEME_PREF).catch(() => null);
     if (themeId && themeId !== DEFAULT_THEME_ID) {

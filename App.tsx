@@ -605,7 +605,7 @@ export default function App() {
                     panes={panes}
                     active={activePane}
                     onActivate={setActivePane}
-                    renderPane={(i, pn, isActive) => (
+                    renderPane={(i, pn, isActive, shownPane) => (
                       <TerminalScreen
                         key={pn.sessionId}
                         host={pn.host}
@@ -624,6 +624,7 @@ export default function App() {
                         active={isActive}
                         onActivate={() => setActivePane(i)}
                         keyboardPad={false}
+                        visible={paneOn && shownPane}
                         onShowSide={
                           sideHidden && (i === 0 || i === 2)
                             ? toggleSide

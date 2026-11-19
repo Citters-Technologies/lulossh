@@ -37,6 +37,7 @@ import {
   fontName,
   TERM_FONT_PREF,
   TERM_FONTS,
+  TERM_RENDERER_PREF,
 } from '../terminal/font';
 import {
   APP_THEME_PREF,
@@ -124,6 +125,17 @@ export function SettingsScreen({
       .then(v => v && setFontId(v))
       .catch(() => {});
   }, []);
+  // Dibujo con GPU (WebGL): más fluido y gasta menos; DOM por si falla.
+  const [gpu, setGpu] = useState(true);
+  useEffect(() => {
+    Ssh.prefGet(TERM_RENDERER_PREF)
+      .then(v => setGpu(v !== 'dom'))
+      .catch(() => {});
+  }, []);
+  const toggleGpu = (on: boolean) => {
+    setGpu(on);
+    Ssh.prefSet(TERM_RENDERER_PREF, on ? 'gpu' : 'dom').catch(() => {});
+  };
   const chooseFont = (id: string) => {
     setFontId(id);
     setFontPicker(false);
@@ -306,6 +318,19 @@ export function SettingsScreen({
             sub={fontName(fontId)}
             onPress={() => setFontPicker(true)}
           />
+          <View style={local.card}>
+            <View style={local.line}>
+              <Text style={local.icon}>⚡</Text>
+              <View style={local.lineText}>
+                <Text style={local.title}>Dibujo con GPU</Text>
+                <Text style={local.sub}>
+                  Más fluido y gasta menos batería con mucha salida. Desactívalo
+                  solo si ves fallos al pintar. Se aplica a sesiones nuevas.
+                </Text>
+              </View>
+              <Switch value={gpu} onValueChange={toggleGpu} />
+            </View>
+          </View>
           <Item
             icon="⌨️"
             title="Botonera de teclas"

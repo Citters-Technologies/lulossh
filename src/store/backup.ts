@@ -15,6 +15,7 @@ export const BACKUP_PREFS = [
   'terminalFontSize',
   'terminalTheme',
   'terminalFont',
+  'terminalRenderer',
   'appTheme',
   'appLock',
   'appLockAfter',

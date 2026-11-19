@@ -35,6 +35,12 @@ export interface TerminalHandle {
   write(base64: string): void;
   /** Historial de una sesión restaurada: se pinta oculto y se muestra al final. */
   replay(base64: string): void;
+  /** Salida acumulada durante una pausa (varios trozos base64). */
+  writeBatch(list: string[]): void;
+  /** Borra y repinta con el historial. */
+  resync(base64: string): void;
+  /** 'gpu' (WebGL) o 'dom'. */
+  setRenderer(which: string): void;
   focus(): void;
   clear(): void;
   clearSelection(): void;
@@ -78,6 +84,11 @@ export const TerminalView = forwardRef<TerminalHandle, Props>(
       // base64 solo contiene [A-Za-z0-9+/=], es seguro dentro de comillas.
       write: b64 => run(`window.lulo.write("${b64}")`),
       replay: b64 => run(`window.lulo.replay("${b64}")`),
+      writeBatch: list =>
+        run(`window.lulo.writeBatch(${JSON.stringify(list)})`),
+      resync: b64 => run(`window.lulo.resync("${b64}")`),
+      setRenderer: which =>
+        run(`window.lulo.setRenderer(${JSON.stringify(which)})`),
       focus: () => run('window.lulo.focus()'),
       clear: () => run('window.lulo.clear()'),
       clearSelection: () => run('window.lulo.clearSelection()'),
@@ -136,6 +147,10 @@ export const TerminalView = forwardRef<TerminalHandle, Props>(
         onReady({ cols: msg.cols, rows: msg.rows });
       } else if (msg.type === 'resize') {
         onResize({ cols: msg.cols, rows: msg.rows });
+      } else if (msg.type === 'renderer') {
+        if (__DEV__) {
+          console.log(`[terminal] dibujo: ${msg.gpu ? 'GPU (WebGL)' : 'DOM'}`);
+        }
       } else if (msg.type === 'appCursor') {
         appCursor.current = !!msg.on;
       } else if (msg.type === 'input') {

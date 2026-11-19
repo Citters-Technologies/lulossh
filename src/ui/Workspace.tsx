@@ -86,7 +86,12 @@ export function Workspace({
   panes: (PaneSession | null)[];
   active: number;
   onActivate(i: number): void;
-  renderPane(i: number, pane: PaneSession, isActive: boolean): React.ReactNode;
+  renderPane(
+    i: number,
+    pane: PaneSession,
+    isActive: boolean,
+    visible: boolean,
+  ): React.ReactNode;
 }) {
   const [size, setSize] = useState({ w: 0, h: 0 });
   // Con varias terminales, el hueco del teclado lo deja el conjunto (no cada
@@ -119,12 +124,9 @@ export function Workspace({
             ]}
           >
             {pane ? (
-              renderPane(i, pane, isActive)
+              renderPane(i, pane, isActive, visible)
             ) : (
-              <Pressable
-                style={local.empty}
-                onPress={() => onActivate(i)}
-              >
+              <Pressable style={local.empty} onPress={() => onActivate(i)}>
                 <Text style={local.emptyTitle}>Panel vacío</Text>
                 <Text style={local.emptySub}>
                   {isActive

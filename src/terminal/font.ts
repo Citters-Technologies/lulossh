@@ -2,6 +2,9 @@
 export const TERM_FONT_PREF = 'terminalFont';
 export const DEFAULT_FONT = 'nerd';
 
+/** Dibujo de la consola: 'gpu' (WebGL, por defecto) o 'dom' (compatibilidad). */
+export const TERM_RENDERER_PREF = 'terminalRenderer';
+
 export interface FontOption {
   id: string;
   name: string;

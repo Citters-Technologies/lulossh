@@ -1,6 +1,6 @@
 // Corre dentro del WebView. Puente entre xterm.js y React Native.
 /* eslint-env browser */
-/* global Terminal, FitAddon */
+/* global Terminal, FitAddon, WebglAddon */
 (function () {
   var post = function (msg) {
     window.ReactNativeWebView.postMessage(JSON.stringify(msg));
@@ -27,6 +27,42 @@
   var fit = new FitAddon.FitAddon();
   term.loadAddon(fit);
   term.open(document.getElementById('term'));
+
+  // ---- Dibujo con GPU (WebGL) --------------------------------------------
+  // Mucho más ligero que el renderizador DOM con salida intensa: menos CPU y
+  // batería. Si el contexto WebGL se pierde (o no hay), se vuelve al DOM.
+  var webgl = null;
+  function enableGpu() {
+    if (webgl || typeof WebglAddon === 'undefined') return;
+    try {
+      var w = new WebglAddon.WebglAddon();
+      w.onContextLoss(function () {
+        disableGpu();
+      });
+      term.loadAddon(w);
+      webgl = w;
+    } catch (e) {
+      webgl = null;
+    }
+    post({ type: 'renderer', gpu: !!webgl });
+  }
+  function disableGpu() {
+    if (!webgl) return;
+    try {
+      webgl.dispose();
+    } catch (e) {}
+    webgl = null;
+    post({ type: 'renderer', gpu: false });
+  }
+  enableGpu();
+  // La fuente incrustada puede terminar de cargar después del primer dibujo:
+  // regenerar los glifos de la GPU para no quedarnos con la de reserva.
+  if (document.fonts && document.fonts.ready) {
+    document.fonts.ready.then(function () {
+      if (webgl) webgl.clearTextureAtlas();
+      term.refresh(0, term.rows - 1);
+    });
+  }
 
   // ---- Cursor propio -----------------------------------------------------
   // xterm, sin foco (teclado nativo), no pinta un cursor visible por más que
@@ -488,6 +524,15 @@
      * Repinta el historial de una sesión restaurada sin que se vea desfilar:
      * se escribe oculto y se muestra ya al final.
      */
+    /** Varios trozos de salida acumulados mientras estaba en pausa. */
+    writeBatch: function (list) {
+      for (var i = 0; i < list.length; i++) window.lulo.write(list[i]);
+    },
+    /** Borra la terminal y la repinta con el historial (tras una pausa larga). */
+    resync: function (b64) {
+      term.reset();
+      window.lulo.replay(b64);
+    },
     replay: function (b64) {
       var bin = atob(b64);
       var bytes = new Uint8Array(bin.length);
@@ -508,7 +553,13 @@
     setFont: function (which) {
       term.options.fontFamily =
         which === 'nerd' ? "'JetBrainsMonoNF', monospace" : 'monospace';
+      if (webgl) webgl.clearTextureAtlas();
       requestAnimationFrame(doFit);
+    },
+    /** 'gpu' (WebGL, por defecto) o 'dom' (compatibilidad). */
+    setRenderer: function (which) {
+      if (which === 'dom') disableGpu();
+      else enableGpu();
     },
     /** Aplica una paleta (JSON del tema): colores de xterm + cursor + fondo. */
     setTheme: function (json) {

@@ -17,6 +17,9 @@ const fitJs = read('node_modules/@xterm/addon-fit/lib/addon-fit.js').replace(
   /\/\/# sourceMappingURL=.*$/m,
   '',
 );
+const webglJs = read(
+  'node_modules/@xterm/addon-webgl/lib/addon-webgl.js',
+).replace(/\/\/# sourceMappingURL=.*$/m, '');
 const css = read('node_modules/@xterm/xterm/css/xterm.css');
 const bridge = read('src/terminal/bridge.js');
 
@@ -71,6 +74,7 @@ html,body,#term{-webkit-user-select:none;user-select:none;-webkit-touch-callout:
 <body><div id="term"></div>
 <script>${safe(xtermJs)}</script>
 <script>${safe(fitJs)}</script>
+<script>${safe(webglJs)}</script>
 <script>${safe(bridge)}</script>
 </body></html>`;
 
