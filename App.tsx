@@ -196,8 +196,11 @@ export default function App() {
   /** Sesiones cuya terminal ya se montó alguna vez en un panel. */
   const mountedSessions = useRef(new Set<string>());
 
-  const closePane = (i: number) =>
+  const closePane = (i: number) => {
     setPanes(ps => ps.map((x, j) => (j === i ? null : x)));
+    // Si se desconectó, que la lista de sesiones abiertas lo refleje ya.
+    setTimeout(refreshLive, 300);
+  };
   const setLocked = (v: boolean) => {
     if (v) {
       // La terminal se desmonta mientras está bloqueado: al volver, restaurar
@@ -258,6 +261,15 @@ export default function App() {
     },
     [showTerminal],
   );
+
+  // Cualquier conexión que se cierre (desconectar, exit, red caída): quitarla
+  // de "Sesiones abiertas" y del contador sin esperar al refresco periódico.
+  useEffect(() => {
+    const sub = sshEvents.addListener('closed', () =>
+      setTimeout(refreshLive, 300),
+    );
+    return () => sub.remove();
+  }, [refreshLive]);
 
   // Atajos del teclado físico: cambiar de panel/sesión y mostrar la lista.
   useEffect(() => {
