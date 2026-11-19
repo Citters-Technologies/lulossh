@@ -46,6 +46,7 @@ export function TerminalScreen({
   onClose,
   onHostKeyAccepted,
   onOsDetected,
+  inPane = false,
 }: {
   host: Host;
   /**
@@ -61,6 +62,8 @@ export function TerminalScreen({
   onHostKeyAccepted(fingerprint: string): void;
   /** SO del servidor detectado (para el icono en la lista). */
   onOsDetected?(os: string): void;
+  /** Panel derecho de la tablet (debajo de las pestañas de sesiones). */
+  inPane?: boolean;
 }) {
   const term = useRef<TerminalHandle>(null);
   const sessionId = useRef(initialId);
@@ -455,7 +458,16 @@ export function TerminalScreen({
     <SafeAreaView
       style={styles.root}
       // Con el teclado abierto, el hueco inferior lo pone keyboardHeight.
-      edges={keyboardHeight > 0 ? ['top', 'left', 'right'] : undefined}
+      // En el panel derecho de la tablet, arriba e izquierda ya están cubiertos.
+      edges={
+        inPane
+          ? keyboardHeight > 0
+            ? ['right']
+            : ['right', 'bottom']
+          : keyboardHeight > 0
+          ? ['top', 'left', 'right']
+          : undefined
+      }
     >
       <View style={styles.header}>
         <Pressable

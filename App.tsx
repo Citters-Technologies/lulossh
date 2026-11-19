@@ -33,13 +33,25 @@ import { TerminalScreen } from './src/screens/TerminalScreen';
 import { Host, validateHost } from './src/store/models';
 import { newId } from './src/store/vault';
 import { useStore } from './src/store/useStore';
+import {
+  EmptyPane,
+  SessionTabs,
+  SIDE_WIDTH,
+  useSplitLayout,
+} from './src/ui/SplitPanes';
 
 const JUICE_PREF = 'juiceImport';
 
 const appStyles = StyleSheet.create({
   blank: { flex: 1, backgroundColor: colors.bg },
   fill: { flex: 1 },
+  row: { flex: 1, flexDirection: 'row', backgroundColor: colors.bg },
   hidden: { display: 'none' },
+  side: {
+    width: SIDE_WIDTH,
+    borderRightWidth: StyleSheet.hairlineWidth,
+    borderRightColor: colors.surface2,
+  },
 });
 
 type Route =
@@ -70,6 +82,8 @@ export default function App() {
   );
   const [live, setLive] = useState<LiveSession[]>([]);
   const home = () => setRoute({ name: 'hosts' });
+  // Tablet: lista a la izquierda y terminal a la derecha.
+  const split = useSplitLayout();
   const setLocked = (v: boolean) => {
     if (v) {
       // La terminal se desmonta mientras está bloqueado: al volver, restaurar
@@ -159,10 +173,20 @@ export default function App() {
   }, [store.loaded, checkPendingOpen]);
 
   useEffect(() => {
-    if (route.name === 'hosts') {
+    if (route.name === 'hosts' || route.name === 'terminal') {
       refreshLive();
     }
   }, [route, refreshLive]);
+
+  // En dos paneles la lista de sesiones está a la vista: mantenerla al día
+  // (una sesión nueva aparece al terminar de conectar).
+  useEffect(() => {
+    if (!split || route.name !== 'terminal') {
+      return;
+    }
+    const t = setInterval(refreshLive, 3000);
+    return () => clearInterval(t);
+  }, [split, route.name, refreshLive]);
 
   // Al abrir: si JuiceSSH está instalado, ofrecer importar (hasta que se haga
   // o el usuario diga que no vuelva a preguntar).
@@ -344,6 +368,10 @@ export default function App() {
     />
   );
 
+  // Dos paneles solo para la lista y la terminal; el resto (ajustes, editar
+  // host…) ocupa toda la pantalla.
+  const paneOn = split && (route.name === 'hosts' || route.name === 'terminal');
+
   let screen: React.ReactNode = null;
   switch (route.name) {
     case 'hosts':
@@ -400,6 +428,7 @@ export default function App() {
           onOsDetected={os =>
             store.patchHost(route.host.id, { os }).catch(() => {})
           }
+          inPane={paneOn}
         />
       );
       break;
@@ -410,14 +439,41 @@ export default function App() {
       <StatusBar barStyle={isLight ? 'dark-content' : 'light-content'} />
       {/* Bloqueado: no se pinta nada de la app (las sesiones siguen en nativo). */}
       {locked === false ? (
-        <>
+        // Misma estructura en móvil y tablet para que la terminal no se
+        // desmonte (y reconecte) al girar la pantalla.
+        <View style={paneOn ? appStyles.row : appStyles.fill}>
           <View
-            style={route.name === 'hosts' ? appStyles.fill : appStyles.hidden}
+            style={
+              paneOn
+                ? appStyles.side
+                : route.name === 'hosts'
+                ? appStyles.fill
+                : appStyles.hidden
+            }
           >
             {tabsView}
           </View>
-          {screen}
-        </>
+          <View
+            style={
+              paneOn || route.name !== 'hosts'
+                ? appStyles.fill
+                : appStyles.hidden
+            }
+          >
+            {paneOn && route.name === 'terminal' && (
+              <SessionTabs
+                live={live}
+                current={route.sessionId}
+                currentTitle={route.host.name}
+                onOpen={openLive}
+              />
+            )}
+            {paneOn && route.name === 'hosts' && (
+              <EmptyPane sessions={live.length} />
+            )}
+            {screen}
+          </View>
+        </View>
       ) : locked === true ? (
         <LockScreen onUnlocked={() => setLocked(false)} />
       ) : (
