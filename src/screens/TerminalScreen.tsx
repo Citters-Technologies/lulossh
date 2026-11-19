@@ -67,8 +67,8 @@ export function TerminalScreen({
   /** Panel derecho de la tablet (debajo de las pestañas de sesiones). */
   inPane?: boolean;
   /**
-   * Tablet con la lista oculta: botón 🏠 a la izquierda y deslizar desde el
-   * borde izquierdo para volver a mostrarla.
+   * Tablet con la lista oculta: deslizar desde el borde izquierdo la vuelve
+   * a mostrar (también el botón ☰ de las pestañas).
    */
   onShowSide?(): void;
 }) {
@@ -553,22 +553,7 @@ export function TerminalScreen({
             </Pressable>
           </View>
         )}
-        {onShowSide && (
-          <>
-            <View style={styles.edge} {...edgePan.panHandlers} />
-            <Pressable
-              onPress={onShowSide}
-              hitSlop={8}
-              accessibilityLabel="Mostrar la lista de hosts"
-              style={({ pressed }) => [
-                styles.homeBtn,
-                pressed && styles.aiBtnPressed,
-              ]}
-            >
-              <Text style={styles.homeGlyph}>🏠</Text>
-            </Pressable>
-          </>
-        )}
+        {onShowSide && <View style={styles.edge} {...edgePan.panHandlers} />}
         {aiTools.length > 0 && (
           <View style={styles.aiBar} pointerEvents="box-none">
             {aiTools.map(t => (
@@ -670,21 +655,6 @@ const styles = StyleSheet.create({
     opacity: 0.45,
   },
   aiBtnPressed: { opacity: 1 },
-  homeBtn: {
-    position: 'absolute',
-    top: 8,
-    left: 8,
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    borderWidth: 1,
-    borderColor: colors.muted,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: 'rgba(11,15,20,0.55)',
-    opacity: 0.6,
-  },
-  homeGlyph: { fontSize: 16 },
   // Franja invisible del borde izquierdo para el gesto de deslizar.
   edge: { position: 'absolute', top: 52, bottom: 0, left: 0, width: 18 },
   selBar: {
