@@ -30,6 +30,38 @@ export interface Host {
    * username/auth del propio host.
    */
   identityId?: string;
+  /**
+   * Sesión persistente: al conectar entra en una sesión de tmux (la crea o se
+   * reengancha). Si se corta la conexión, lo que corría sigue en el servidor
+   * y al reconectar se vuelve al mismo terminal.
+   */
+  tmux?: boolean;
+  /** Nombre de la sesión de tmux (por defecto DEFAULT_TMUX_SESSION). */
+  tmuxSession?: string;
+}
+
+export const DEFAULT_TMUX_SESSION = 'lulossh';
+
+/** Nombre de sesión de tmux seguro para la línea de comandos. */
+export function tmuxSessionName(h: Pick<Host, 'tmuxSession'>): string {
+  return (
+    (h.tmuxSession ?? '').replace(/[^A-Za-z0-9_.-]/g, '') ||
+    DEFAULT_TMUX_SESSION
+  );
+}
+
+/**
+ * Lo que se escribe en la shell al conectar para entrar en tmux. Empieza con
+ * espacio para no quedar en el historial (HISTCONTROL=ignorespace) y activa
+ * el ratón en esa sesión para que el desplazamiento táctil recorra el
+ * historial de tmux. Sin tmux instalado, avisa y se queda en la shell.
+ */
+export function tmuxCommand(h: Pick<Host, 'tmuxSession'>): string {
+  const n = tmuxSessionName(h);
+  return (
+    ` command -v tmux >/dev/null 2>&1 && exec tmux new-session -A -s ${n} \\; set-option mouse on` +
+    ` || echo "LuloSSH: tmux no está instalado en este servidor (p. ej. sudo apt install tmux)"\r`
+  );
 }
 
 /** Usuario + credenciales reutilizables en muchos hosts (como en JuiceSSH). */

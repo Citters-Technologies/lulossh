@@ -4,11 +4,19 @@ import {
   Pressable,
   ScrollView,
   StyleSheet,
+  Switch,
+  View,
 } from 'react-native';
 import { Text } from '../ui/Text';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { allFolderPaths, normPath, splitPath } from '../store/folders';
-import { Host, HostAuth, resolveHost, validateHost } from '../store/models';
+import {
+  DEFAULT_TMUX_SESSION,
+  Host,
+  HostAuth,
+  resolveHost,
+  validateHost,
+} from '../store/models';
 import { Store } from '../store/useStore';
 import { Button, colors, Field, Header, Segmented, styles } from '../ui/kit';
 
@@ -23,6 +31,14 @@ const local = StyleSheet.create({
   chipActive: { backgroundColor: colors.accent },
   chipText: { color: colors.text },
   selected: { borderWidth: 2, borderColor: colors.accent },
+  persist: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    marginTop: 12,
+    marginBottom: 4,
+  },
+  persistText: { flex: 1 },
 });
 
 type AuthChoice = 'identity' | HostAuth['type'];
@@ -64,6 +80,8 @@ export function HostEditScreen({
       ? host.auth.keyId
       : store.keys[0]?.id ?? '',
   );
+  const [tmux, setTmux] = useState(host?.tmux ?? false);
+  const [tmuxSession, setTmuxSession] = useState(host?.tmuxSession ?? '');
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const folders = useMemo(() => allFolderPaths(store.hosts), [store.hosts]);
@@ -85,6 +103,8 @@ export function HostEditScreen({
       username: username.trim(),
       group: normPath(group),
       identityId: identity?.id,
+      tmux: tmux || undefined,
+      tmuxSession: tmux && tmuxSession.trim() ? tmuxSession.trim() : undefined,
       auth:
         authType === 'password'
           ? { type: 'password', password }
@@ -254,6 +274,26 @@ export function HostEditScreen({
               <Text style={styles.rowSub}>{k.type}</Text>
             </Pressable>
           ))
+        )}
+
+        <View style={local.persist}>
+          <View style={local.persistText}>
+            <Text style={styles.rowTitle}>Sesión persistente (tmux)</Text>
+            <Text style={styles.rowSub}>
+              Si se corta la conexión, lo que estaba corriendo sigue en el
+              servidor y al reconectar vuelves al mismo terminal. Necesita tmux
+              en el servidor.
+            </Text>
+          </View>
+          <Switch value={tmux} onValueChange={setTmux} />
+        </View>
+        {tmux && (
+          <Field
+            label="Nombre de la sesión de tmux"
+            value={tmuxSession}
+            onChangeText={setTmuxSession}
+            placeholder={DEFAULT_TMUX_SESSION}
+          />
         )}
 
         <Button title="Guardar" onPress={save} disabled={busy} />

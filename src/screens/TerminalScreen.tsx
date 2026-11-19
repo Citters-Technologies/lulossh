@@ -21,7 +21,7 @@ import {
   ModifierState,
 } from '../keyboard/model';
 import { Ssh, sshEvents, toBase64 } from '../native/SshModule';
-import { Host, hostLabel } from '../store/models';
+import { Host, hostLabel, tmuxCommand } from '../store/models';
 import { newId, withUnlock } from '../store/vault';
 import { TerminalHandle, TerminalView } from '../terminal/TerminalView';
 import {
@@ -553,6 +553,10 @@ export function TerminalScreen({
       );
       connected.current = true;
       setStatus('Conectado');
+      // Sesión persistente: entrar (o volver) a la sesión de tmux.
+      if (host.tmux) {
+        send(tmuxCommand(host));
+      }
       // Se conectó con `size`; si cambió mientras tanto, enviar el actual.
       sentSize.current = `${size.cols}x${size.rows}`;
       onResize(lastSize.current);
