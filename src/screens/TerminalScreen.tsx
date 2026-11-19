@@ -361,7 +361,11 @@ export function TerminalScreen({
 
   // Mientras se repinta el historial de una sesión restaurada, los datos
   // nuevos ya vienen incluidos en él.
-  const replaying = useRef(resumeSession);
+  // Conectar o restaurar se decide al crear la terminal: el valor de la prop
+  // puede cambiar después (p. ej. el panel la marca como ya abierta) y la
+  // conexión nueva acabaría intentando restaurar una sesión que no existe.
+  const resumeAtMount = useRef(resumeSession).current;
+  const replaying = useRef(resumeAtMount);
   const lastSize = useRef({ cols: 80, rows: 24 });
   const [canReconnect, setCanReconnect] = useState(false);
 
@@ -534,7 +538,7 @@ export function TerminalScreen({
     if (fontSize.current !== FONT_DEFAULT) {
       term.current?.setFontSize(fontSize.current);
     }
-    if (resumeSession) {
+    if (resumeAtMount) {
       await resume();
     } else {
       await connect(size);
