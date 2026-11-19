@@ -86,11 +86,16 @@ export function TerminalScreen({
   // Toque en la consola: con el teclado abierto, mostrar/ocultar solo la
   // botonera de teclas; con el teclado cerrado, abrir teclado y botonera.
   // (El teclado se cierra con el gesto/botón atrás de Android.)
-  const onTap = () => {
+  const onTap = async () => {
     // keyboardHeight puede quedar desfasado tras apagar la pantalla.
     if (keyboardHeight > 0 && Keyboard.isVisible()) {
       setBarVisible(v => !v);
       Ssh.ensureKeyboardFocus();
+    } else if (await Ssh.hasHardwareKeyboard().catch(() => false)) {
+      // Con teclado físico no sale el de pantalla: el toque solo alterna la
+      // botonera (y asegura que las teclas lleguen a la terminal).
+      setBarVisible(v => !v);
+      Ssh.showKeyboard();
     } else {
       setBarVisible(true);
       Ssh.showKeyboard();

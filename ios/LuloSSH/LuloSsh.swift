@@ -1,6 +1,7 @@
 import Citadel
 import Crypto
 import Foundation
+import GameController
 import NIOCore
 import NIOSSH
 import UIKit
@@ -406,6 +407,11 @@ final class LuloSsh: RCTEventEmitter {
   @objc func showKeyboard() {}
   @objc(hideKeyboard:) func hideKeyboard(_ detach: Bool) {}
   @objc func ensureKeyboardFocus() {}
+
+  @objc(hasHardwareKeyboard:reject:)
+  func hasHardwareKeyboard(_ resolve: RCTPromiseResolveBlock, reject: RCTPromiseRejectBlock) {
+    resolve(GCKeyboard.coalesced != nil)
+  }
   @objc(setVolumeKeysEnabled:) func setVolumeKeysEnabled(_ enabled: Bool) {}
 
   @objc(prefGet:resolve:reject:)

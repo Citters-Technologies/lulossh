@@ -150,6 +150,16 @@ class SshModule(private val rc: ReactApplicationContext) : ReactContextBaseJavaM
         }
     }
 
+    /** ¿Hay un teclado físico conectado y activo (Bluetooth/USB/funda)? */
+    @ReactMethod
+    fun hasHardwareKeyboard(promise: Promise) {
+        val c = rc.resources.configuration
+        promise.resolve(
+            c.keyboard == android.content.res.Configuration.KEYBOARD_QWERTY &&
+                c.hardKeyboardHidden == android.content.res.Configuration.HARDKEYBOARDHIDDEN_NO,
+        )
+    }
+
     @ReactMethod
     fun ensureKeyboardFocus() {
         val activity = rc.currentActivity ?: return

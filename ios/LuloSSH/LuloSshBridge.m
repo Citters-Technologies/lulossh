@@ -26,6 +26,7 @@ RCT_EXTERN_METHOD(deleteKey:(NSString *)keyId resolve:(RCTPromiseResolveBlock)re
 RCT_EXTERN_METHOD(showKeyboard)
 RCT_EXTERN_METHOD(hideKeyboard:(BOOL)detach)
 RCT_EXTERN_METHOD(ensureKeyboardFocus)
+RCT_EXTERN_METHOD(hasHardwareKeyboard:(RCTPromiseResolveBlock)resolve reject:(RCTPromiseRejectBlock)reject)
 RCT_EXTERN_METHOD(setVolumeKeysEnabled:(BOOL)enabled)
 RCT_EXTERN_METHOD(prefGet:(NSString *)name resolve:(RCTPromiseResolveBlock)resolve reject:(RCTPromiseRejectBlock)reject)
 RCT_EXTERN_METHOD(prefSet:(NSString *)name value:(NSString *)value resolve:(RCTPromiseResolveBlock)resolve reject:(RCTPromiseRejectBlock)reject)

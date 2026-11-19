@@ -101,6 +101,8 @@ export interface SshModuleSpec {
    */
   showKeyboard(): void;
   hideKeyboard(detach: boolean): void;
+  /** ¿Hay un teclado físico conectado (funda, Bluetooth, USB)? */
+  hasHardwareKeyboard(): Promise<boolean>;
   /** Devuelve el foco del teclado a la vista de entrada si otra lo robó. */
   ensureKeyboardFocus(): void;
   /** Sondea las sesiones abiertas; las muertas se cierran con motivo. */
