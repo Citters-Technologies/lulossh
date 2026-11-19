@@ -144,9 +144,11 @@ class SshModule(private val rc: ReactApplicationContext) : ReactContextBaseJavaM
     fun showKeyboard() {
         val activity = rc.currentActivity ?: return
         activity.runOnUiThread {
-            TerminalInput.show(activity) { data ->
-                emit("termInput", Arguments.createMap().apply { putString("data", data) })
-            }
+            TerminalInput.show(
+                activity,
+                { data -> emit("termInput", Arguments.createMap().apply { putString("data", data) }) },
+                { action -> emit("termShortcut", Arguments.createMap().apply { putString("action", action) }) },
+            )
         }
     }
 

@@ -23,7 +23,11 @@ import android.widget.FrameLayout
  * Lo escrito se envía a JS como texto/secuencias de terminal.
  */
 @SuppressLint("ViewConstructor")
-class TerminalInputView(context: Context, private val onData: (String) -> Unit) : View(context) {
+class TerminalInputView(
+    context: Context,
+    private val onData: (String) -> Unit,
+    private val onShortcut: (String) -> Unit,
+) : View(context) {
 
     init {
         isFocusable = true
@@ -87,7 +91,39 @@ class TerminalInputView(context: Context, private val onData: (String) -> Unit) 
      * modificadores en flechas/Inicio/Fin/F1-F12 van como CSI 1;m X, con
      * m = 1 + Shift(1) + Alt(2) + Ctrl(4).
      */
+    /**
+     * Atajos de la app con teclado físico (no llegan al servidor). Van con
+     * Ctrl+Shift para no quitarle combinaciones a los programas remotos,
+     * salvo Ctrl+Tab y Ctrl +/-, que los terminales no usan.
+     */
+    private fun shortcutFor(event: KeyEvent): String? {
+        if (!event.isCtrlPressed || event.isAltPressed) return null
+        val shift = event.isShiftPressed
+        // + y - por carácter: en el teclado español están en otras teclas.
+        when (event.getUnicodeChar(event.metaState and KeyEvent.META_CTRL_MASK.inv()).toChar()) {
+            '+', '=' -> return "zoomIn"
+            '-' -> if (!shift) return "zoomOut"
+        }
+        return when (event.keyCode) {
+            KeyEvent.KEYCODE_TAB -> if (shift) "prevPane" else "nextPane"
+            KeyEvent.KEYCODE_NUMPAD_ADD -> "zoomIn"
+            KeyEvent.KEYCODE_NUMPAD_SUBTRACT -> "zoomOut"
+            KeyEvent.KEYCODE_1 -> if (shift) "pane1" else null
+            KeyEvent.KEYCODE_2 -> if (shift) "pane2" else null
+            KeyEvent.KEYCODE_3 -> if (shift) "pane3" else null
+            KeyEvent.KEYCODE_4 -> if (shift) "pane4" else null
+            KeyEvent.KEYCODE_L -> if (shift) "toggleSide" else null
+            KeyEvent.KEYCODE_C -> if (shift) "copy" else null
+            KeyEvent.KEYCODE_V -> if (shift) "paste" else null
+            else -> null
+        }
+    }
+
     private fun handleKey(event: KeyEvent): Boolean {
+        shortcutFor(event)?.let {
+            onShortcut(it)
+            return true
+        }
         val mod = 1 + (if (event.isShiftPressed) 1 else 0) +
             (if (event.isAltPressed) 2 else 0) + (if (event.isCtrlPressed) 4 else 0)
         fun csiLetter(x: Char) = if (mod == 1) "\u001b[$x" else "\u001b[1;$mod$x"
@@ -170,8 +206,8 @@ class TerminalInputView(context: Context, private val onData: (String) -> Unit) 
 object TerminalInput {
     private var view: TerminalInputView? = null
 
-    fun show(activity: Activity, onData: (String) -> Unit) {
-        val v = view?.takeIf { it.context === activity } ?: TerminalInputView(activity, onData).also { nv ->
+    fun show(activity: Activity, onData: (String) -> Unit, onShortcut: (String) -> Unit) {
+        val v = view?.takeIf { it.context === activity } ?: TerminalInputView(activity, onData, onShortcut).also { nv ->
             view?.let { (it.parent as? ViewGroup)?.removeView(it) }
             val root = activity.findViewById<FrameLayout>(android.R.id.content)
             // 1x1 px y transparente: solo existe para recibir el teclado.

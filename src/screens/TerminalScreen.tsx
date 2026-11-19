@@ -201,22 +201,9 @@ export function TerminalScreen({
 
     Ssh.setVolumeKeysEnabled(true);
     const sub = sshEvents.addListener('volumeKey', (p: any) => {
-      if (!activeRef.current) {
-        return;
+      if (activeRef.current) {
+        zoomRef.current(p.direction === 'up' ? 1 : -1);
       }
-      const next = Math.min(
-        FONT_MAX,
-        Math.max(FONT_MIN, fontSize.current + (p.direction === 'up' ? 1 : -1)),
-      );
-      if (next === fontSize.current) {
-        return;
-      }
-      fontSize.current = next;
-      term.current?.setFontSize(next);
-      Ssh.prefSet(FONT_PREF, String(next)).catch(() => {});
-      setFontHint(`Letra ${next}`);
-      clearTimeout(hintTimer.current);
-      hintTimer.current = setTimeout(() => setFontHint(null), 1200);
     });
     return () => {
       if (activeRef.current) {
@@ -225,6 +212,47 @@ export function TerminalScreen({
       sub.remove();
       clearTimeout(hintTimer.current);
     };
+  }, []);
+
+  /** Tamaño de letra: teclas de volumen y Ctrl +/- (se recuerda). */
+  const zoom = (delta: number) => {
+    const next = Math.min(
+      FONT_MAX,
+      Math.max(FONT_MIN, fontSize.current + delta),
+    );
+    if (next === fontSize.current) {
+      return;
+    }
+    fontSize.current = next;
+    term.current?.setFontSize(next);
+    Ssh.prefSet(FONT_PREF, String(next)).catch(() => {});
+    setFontHint(`Letra ${next}`);
+    clearTimeout(hintTimer.current);
+    hintTimer.current = setTimeout(() => setFontHint(null), 1200);
+  };
+  const zoomRef = useRef(zoom);
+  zoomRef.current = zoom;
+
+  // Atajos del teclado físico que actúan sobre la terminal activa.
+  const shortcutRef = useRef<(action: string) => void>(() => {});
+  shortcutRef.current = (action: string) => {
+    if (action === 'zoomIn') {
+      zoom(1);
+    } else if (action === 'zoomOut') {
+      zoom(-1);
+    } else if (action === 'copy') {
+      copySelection();
+    } else if (action === 'paste') {
+      paste();
+    }
+  };
+  useEffect(() => {
+    const sub = sshEvents.addListener('termShortcut', (p: any) => {
+      if (activeRef.current) {
+        shortcutRef.current(p.action);
+      }
+    });
+    return () => sub.remove();
   }, []);
 
   const send = useCallback((data: string) => {

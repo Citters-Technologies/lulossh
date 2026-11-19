@@ -26,7 +26,7 @@ import {
 import { colors, isLight } from './src/ui/kit';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { importFromJuiceSsh } from './src/import/ui';
-import { LiveSession, Ssh } from './src/native/SshModule';
+import { LiveSession, Ssh, sshEvents } from './src/native/SshModule';
 import { HostEditScreen } from './src/screens/HostEditScreen';
 import { HostsScreen } from './src/screens/HostsScreen';
 import { KeysScreen } from './src/screens/KeysScreen';
@@ -163,6 +163,13 @@ export default function App() {
     }
     setRoute({ name: 'hosts' });
   }, []);
+  const liveRef = useRef(live);
+  liveRef.current = live;
+  const layoutRef = useRef(paneLayout);
+  layoutRef.current = paneLayout;
+  const toggleSideRef = useRef(() => {});
+  toggleSideRef.current = toggleSide;
+
   const closePane = (i: number) =>
     setPanes(ps => ps.map((x, j) => (j === i ? null : x)));
   const setLocked = (v: boolean) => {
@@ -225,6 +232,45 @@ export default function App() {
     },
     [showTerminal],
   );
+
+  // Atajos del teclado físico: cambiar de panel/sesión y mostrar la lista.
+  useEffect(() => {
+    const cycle = (dir: number) => {
+      if (splitRef.current) {
+        const count = paneCount(layoutRef.current);
+        if (count > 1) {
+          setActivePane(a => (a + dir + count) % count);
+          return;
+        }
+      }
+      const ls = liveRef.current;
+      if (ls.length < 2) {
+        return;
+      }
+      const r = routeRef.current;
+      const cur = splitRef.current
+        ? panesRef.current[activePaneRef.current]?.sessionId
+        : r.name === 'terminal'
+        ? r.sessionId
+        : undefined;
+      const i = ls.findIndex(x => x.sessionId === cur);
+      openLive(ls[(i + dir + ls.length) % ls.length]);
+    };
+    const sub = sshEvents.addListener('termShortcut', (p: any) => {
+      const a: string = p.action;
+      if (a === 'nextPane' || a === 'prevPane') {
+        cycle(a === 'nextPane' ? 1 : -1);
+      } else if (a.startsWith('pane')) {
+        const n = Number(a.slice(4)) - 1;
+        if (splitRef.current && n < paneCount(layoutRef.current)) {
+          setActivePane(n);
+        }
+      } else if (a === 'toggleSide' && splitRef.current) {
+        toggleSideRef.current();
+      }
+    });
+    return () => sub.remove();
+  }, [openLive]);
 
   // Toque en la notificación de sesiones: abrir la sesión indicada.
   const checkPendingOpen = useCallback(async () => {

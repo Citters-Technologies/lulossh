@@ -48,6 +48,8 @@ export interface SshSessionEvents {
   /** El host es nuevo o su huella cambió: la UI debe pedir confirmación. */
   hostKey: { sessionId: string; fingerprint: string; changed: boolean };
   error: { sessionId: string; message: string };
+  /** Atajo del teclado físico (nextPane, pane1…4, toggleSide, copy…). */
+  termShortcut: { action: string };
 }
 
 export interface SshModuleSpec {

@@ -23,7 +23,7 @@ final class LuloSsh: RCTEventEmitter {
   override static func requiresMainQueueSetup() -> Bool { false }
 
   override func supportedEvents() -> [String]! {
-    ["data", "closed", "hostKey", "error", "termInput", "volumeKey"]
+    ["data", "closed", "hostKey", "error", "termInput", "termShortcut", "volumeKey"]
   }
 
   /// El modo claro/oscuro tiene que conocerse antes de crear los estilos.
