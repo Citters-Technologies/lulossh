@@ -5,9 +5,9 @@ import {
   ScrollView,
   Share,
   StyleSheet,
-  Text,
   View,
 } from 'react-native';
+import { Text } from '../ui/Text';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { isPrivateKeyText } from '../import/xshell';
 import { Ssh } from '../native/SshModule';

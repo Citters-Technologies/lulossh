@@ -4,9 +4,9 @@ import {
   Pressable,
   ScrollView,
   StyleSheet,
-  Text,
   View,
 } from 'react-native';
+import { Text } from '../ui/Text';
 import { LiveSession } from '../native/SshModule';
 import { Button, colors, styles } from '../ui/kit';
 

@@ -5,10 +5,10 @@ import {
   Pressable,
   ScrollView,
   StyleSheet,
-  Text,
   TextInput,
   View,
 } from 'react-native';
+import { Text } from '../ui/Text';
 import { LiveSession, Ssh } from '../native/SshModule';
 import {
   buildTree,

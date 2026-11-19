@@ -4,9 +4,9 @@ import {
   Pressable,
   ScrollView,
   StyleSheet,
-  Text,
   View,
 } from 'react-native';
+import { Text } from '../ui/Text';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { APP_LICENSE, COMPONENTS } from '../legal/licenses';
 import { colors, Header, styles } from '../ui/kit';

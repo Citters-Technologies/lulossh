@@ -4,11 +4,11 @@ import {
   NativeModules,
   Pressable,
   StyleSheet,
-  Text,
   TextInput,
   TextInputProps,
   View,
 } from 'react-native';
+import { Text } from './Text';
 
 /**
  * Modo de color de la app. Los estilos se crean al cargar los módulos, así

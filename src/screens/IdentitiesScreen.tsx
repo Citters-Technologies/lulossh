@@ -4,9 +4,9 @@ import {
   Pressable,
   ScrollView,
   StyleSheet,
-  Text,
   View,
 } from 'react-native';
+import { Text } from '../ui/Text';
 import { HostAuth, Identity } from '../store/models';
 import { Store } from '../store/useStore';
 import { HostPicker } from '../ui/HostPicker';

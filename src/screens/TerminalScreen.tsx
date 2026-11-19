@@ -5,9 +5,9 @@ import {
   Keyboard,
   Pressable,
   StyleSheet,
-  Text,
   View,
 } from 'react-native';
+import { Text } from '../ui/Text';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { AiTool, detectCommand, parseDetect } from '../ai/tools';
 import { osCommand, parseOs } from '../remote/osInfo';

@@ -1,5 +1,12 @@
 import React, { useEffect, useState } from 'react';
-import { Alert, Modal, Pressable, StyleSheet, Text, View } from 'react-native';
+import {
+  Alert,
+  Modal,
+  Pressable,
+  StyleSheet,
+  View,
+} from 'react-native';
+import { Text } from '../ui/Text';
 import { expectExternalActivity } from '../ui/appLock';
 import { confirmUpdates, importFromJuiceSsh, showSummary } from '../import/ui';
 import { ImportResult, parseImport } from '../import/xshell';

@@ -1,5 +1,11 @@
 import React, { useMemo, useState } from 'react';
-import { Alert, Pressable, ScrollView, StyleSheet, Text } from 'react-native';
+import {
+  Alert,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+} from 'react-native';
+import { Text } from '../ui/Text';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { allFolderPaths, normPath, splitPath } from '../store/folders';
 import { Host, HostAuth, resolveHost, validateHost } from '../store/models';

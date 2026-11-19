@@ -1,15 +1,18 @@
 import React, { useEffect, useState } from 'react';
 import {
   Alert,
+  Image,
   Modal,
   Linking,
   Pressable,
   ScrollView,
   StyleSheet,
   Switch,
-  Text,
+  useWindowDimensions,
   View,
 } from 'react-native';
+import { Text } from '../ui/Text';
+import * as Application from 'expo-application';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ssh } from '../native/SshModule';
 import {
@@ -54,6 +57,27 @@ const APP_THEME_OPTIONS: { value: AppThemeMode; label: string }[] = [
 ];
 
 const REPO = 'https://github.com/Citters-Technologies/lulossh';
+const LOGO = require('../../assets/logo/lulossh-icon.png');
+
+/** Ancho mínimo (dp) para el diseño de dos paneles. */
+const WIDE_MIN = 720;
+
+interface SettingsSection {
+  id: string;
+  icon: string;
+  title: string;
+  body: React.ReactNode;
+}
+
+/** "Versión 0.1.0 (compilación 1)", leída del binario instalado. */
+function versionLabel(): string {
+  const v = Application.nativeApplicationVersion;
+  const b = Application.nativeBuildVersion;
+  if (!v) {
+    return 'Versión desconocida';
+  }
+  return b ? `Versión ${v} (compilación ${b})` : `Versión ${v}`;
+}
 
 export function SettingsScreen({
   store,
@@ -69,6 +93,10 @@ export function SettingsScreen({
   onLockChange(s: LockSettings): void;
 }) {
   const [lock, setLock] = useState<LockSettings | null>(null);
+  // En pantallas anchas (tablet, móvil plegable abierto) va en dos paneles.
+  const { width } = useWindowDimensions();
+  const wide = width >= WIDE_MIN;
+  const [current, setCurrent] = useState('appearance');
   const [pw, setPw] = useState<{
     mode: 'export' | 'restore';
     a: string;
@@ -239,11 +267,12 @@ export function SettingsScreen({
     saveLock({ ...lock, enabled });
   };
 
-  return (
-    <SafeAreaView style={styles.screen}>
-      <Header title="Ajustes" left={{ label: '‹ Volver', onPress: onBack }} />
-      <ScrollView contentContainerStyle={styles.body}>
-        <Text style={styles.section}>Apariencia</Text>
+  const sections: SettingsSection[] = [
+    {
+      id: 'appearance',
+      icon: '🌓',
+      title: 'Apariencia',
+      body: (
         <View style={local.card}>
           <View style={local.line}>
             <Text style={local.icon}>🌓</Text>
@@ -263,8 +292,13 @@ export function SettingsScreen({
             />
           </View>
         </View>
-
-        <Text style={styles.section}>Seguridad</Text>
+      ),
+    },
+    {
+      id: 'security',
+      icon: '🔐',
+      title: 'Seguridad',
+      body: (
         <View style={local.card}>
           <View style={local.line}>
             <Text style={local.icon}>🔐</Text>
@@ -293,58 +327,160 @@ export function SettingsScreen({
             </>
           )}
         </View>
+      ),
+    },
+    {
+      id: 'import',
+      icon: '📦',
+      title: 'Importar',
+      body: <ImportSection store={store} />,
+    },
+    {
+      id: 'backup',
+      icon: '💾',
+      title: 'Copia de seguridad',
+      body: (
+        <>
+          <Item
+            icon="📤"
+            title="Exportar copia cifrada"
+            sub={`Hosts, identidades, claves privadas y ajustes, protegidos con una contraseña. ${store.hosts.length} hosts · ${store.identities.length} identidades · ${store.keys.length} claves`}
+            onPress={() => setPw({ mode: 'export', a: '', b: '' })}
+          />
+          <Item
+            icon="📥"
+            title="Restaurar copia"
+            sub="Añade lo que falte desde un fichero .lulossh (no borra nada)"
+            onPress={pickBackup}
+          />
+        </>
+      ),
+    },
+    {
+      id: 'terminal',
+      icon: '🖥️',
+      title: 'Terminal',
+      body: (
+        <>
+          <Item
+            icon="🎨"
+            title="Tema de color"
+            sub={`Colores de la consola · ${themeById(themeId).name}`}
+            onPress={() => setThemePicker(true)}
+          />
+          <Item
+            icon="🔤"
+            title="Fuente"
+            sub={fontName(fontId)}
+            onPress={() => setFontPicker(true)}
+          />
+          <Item
+            icon="⌨️"
+            title="Botonera de teclas"
+            sub="Añade, quita y ordena las teclas de encima del teclado"
+            onPress={onEditKeyBar}
+          />
+        </>
+      ),
+    },
+    {
+      id: 'about',
+      icon: '🍊',
+      title: 'Acerca de',
+      body: (
+        <>
+          <View style={[local.card, local.about]}>
+            <Image source={LOGO} style={local.aboutLogo} />
+            <Text style={local.aboutName}>
+              Lulo<Text style={local.aboutAccent}>SSH</Text>
+            </Text>
+            <Text style={local.sub}>{versionLabel()}</Text>
+            <Text style={[local.sub, local.aboutText]}>
+              Cliente SSH de código abierto para Android e iOS.
+            </Text>
+            <Text style={[local.sub, local.aboutText]}>
+              © Citters Technologies SLU · AGPL-3.0
+            </Text>
+          </View>
+          <Item
+            icon="🐙"
+            title="Código fuente"
+            sub="github.com/Citters-Technologies/lulossh"
+            onPress={() => Linking.openURL(REPO)}
+          />
+          <Item
+            icon="⚖️"
+            title="Componentes y licencias"
+            sub="Librerías de terceros que incluye la app y sus licencias"
+            onPress={onLicenses}
+          />
+          <Item
+            icon="✉️"
+            title="Contacto"
+            sub="hola@citters.com"
+            onPress={() => Linking.openURL('mailto:hola@citters.com')}
+          />
+        </>
+      ),
+    },
+  ];
 
-        <Text style={styles.section}>Importar</Text>
-        <ImportSection store={store} />
-
-        <Text style={styles.section}>Copia de seguridad</Text>
-        <Item
-          icon="📤"
-          title="Exportar copia cifrada"
-          sub={`Hosts, identidades, claves privadas y ajustes, protegidos con una contraseña. ${store.hosts.length} hosts · ${store.identities.length} identidades · ${store.keys.length} claves`}
-          onPress={() => setPw({ mode: 'export', a: '', b: '' })}
-        />
-        <Item
-          icon="📥"
-          title="Restaurar copia"
-          sub="Añade lo que falte desde un fichero .lulossh (no borra nada)"
-          onPress={pickBackup}
-        />
-
-        <Text style={styles.section}>Terminal</Text>
-        <Item
-          icon="🎨"
-          title="Tema de color"
-          sub={`Colores de la consola · ${themeById(themeId).name}`}
-          onPress={() => setThemePicker(true)}
-        />
-        <Item
-          icon="🔤"
-          title="Fuente"
-          sub={fontName(fontId)}
-          onPress={() => setFontPicker(true)}
-        />
-        <Item
-          icon="⌨️"
-          title="Botonera de teclas"
-          sub="Añade, quita y ordena las teclas de encima del teclado"
-          onPress={onEditKeyBar}
-        />
-
-        <Text style={styles.section}>Acerca de</Text>
-        <Item
-          icon="🍊"
-          title="LuloSSH"
-          sub="Código abierto (AGPL-3.0) · Citters Technologies SLU"
-          onPress={() => Linking.openURL(REPO)}
-        />
-        <Item
-          icon="⚖️"
-          title="Componentes y licencias"
-          sub="Librerías de terceros que incluye la app y sus licencias"
-          onPress={onLicenses}
-        />
-      </ScrollView>
+  return (
+    <SafeAreaView style={styles.screen}>
+      <Header title="Ajustes" left={{ label: '‹ Volver', onPress: onBack }} />
+      {wide ? (
+        // Tablet: menú de secciones a la izquierda y su contenido a la derecha,
+        // como los Ajustes del sistema.
+        <View style={local.split}>
+          <ScrollView style={local.menu} contentContainerStyle={local.menuBody}>
+            {sections.map(sec => {
+              const on = sec.id === current;
+              return (
+                <Pressable
+                  key={sec.id}
+                  onPress={() => setCurrent(sec.id)}
+                  style={({ pressed }) => [
+                    local.menuItem,
+                    on && local.menuItemOn,
+                    pressed && local.pressed,
+                  ]}
+                >
+                  <Text style={local.icon}>{sec.icon}</Text>
+                  <Text
+                    style={[local.menuText, on && local.menuTextOn]}
+                    numberOfLines={1}
+                  >
+                    {sec.title}
+                  </Text>
+                </Pressable>
+              );
+            })}
+          </ScrollView>
+          <ScrollView
+            key={current}
+            style={local.detail}
+            contentContainerStyle={local.detailBody}
+          >
+            {sections
+              .filter(sec => sec.id === current)
+              .map(sec => (
+                <View key={sec.id}>
+                  <Text style={local.detailTitle}>{sec.title}</Text>
+                  {sec.body}
+                </View>
+              ))}
+          </ScrollView>
+        </View>
+      ) : (
+        <ScrollView contentContainerStyle={styles.body}>
+          {sections.map(sec => (
+            <View key={sec.id}>
+              <Text style={styles.section}>{sec.title}</Text>
+              {sec.body}
+            </View>
+          ))}
+        </ScrollView>
+      )}
 
       <Modal
         visible={fontPicker}
@@ -579,4 +715,36 @@ const local = StyleSheet.create({
   swCursor: { width: 7, height: 16, borderRadius: 1, marginLeft: 2 },
   themeName: { flex: 1, color: colors.strong, fontSize: 15, fontWeight: '600' },
   themeCheck: { color: colors.accent, fontSize: 18, fontWeight: '800' },
+  split: { flex: 1, flexDirection: 'row' },
+  menu: {
+    width: 280,
+    flexGrow: 0,
+    borderRightWidth: StyleSheet.hairlineWidth,
+    borderRightColor: colors.surface2,
+  },
+  menuBody: { padding: 12, gap: 2 },
+  menuItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    paddingVertical: 12,
+    paddingHorizontal: 12,
+    borderRadius: 12,
+  },
+  menuItemOn: { backgroundColor: colors.surface },
+  menuText: { flex: 1, color: colors.text, fontSize: 16 },
+  menuTextOn: { color: colors.strong, fontWeight: '700' },
+  detail: { flex: 1 },
+  detailBody: { padding: 24, maxWidth: 760 },
+  detailTitle: {
+    color: colors.strong,
+    fontSize: 22,
+    fontWeight: '800',
+    marginBottom: 16,
+  },
+  about: { alignItems: 'center', paddingVertical: 24 },
+  aboutLogo: { width: 96, height: 96, marginBottom: 12 },
+  aboutName: { color: colors.strong, fontSize: 26, fontWeight: '800' },
+  aboutAccent: { color: colors.brand },
+  aboutText: { textAlign: 'center', marginTop: 6 },
 });
