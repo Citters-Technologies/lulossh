@@ -36,6 +36,7 @@ final class LuloSsh: RCTEventEmitter {
   override init() {
     super.init()
     Self.current = self
+    RsaKeyAuth.registerAlgorithms()
   }
   private let vault = Vault()
   private let prefs = UserDefaults(suiteName: "lulossh_ui") ?? .standard

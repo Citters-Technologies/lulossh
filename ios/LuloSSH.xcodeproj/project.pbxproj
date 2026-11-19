@@ -7,35 +7,39 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
-		068F595BE9543CADB904EFFD /* LuloSSH/LuloSsh.swift in Sources */ = {isa = PBXBuildFile; fileRef = CAF5793695BE11F06A58C34F /* LuloSSH/LuloSsh.swift */; };
+		006BD5F9915423D1E9C36237 /* RsaSha2.swift in Sources */ = {isa = PBXBuildFile; fileRef = 028CD94C7D0057765E6FB195 /* RsaSha2.swift */; };
+		068F595BE9543CADB904EFFD /* LuloSsh.swift in Sources */ = {isa = PBXBuildFile; fileRef = CAF5793695BE11F06A58C34F /* LuloSsh.swift */; };
 		0C80B921A6F3F58F76C31292 /* libPods-LuloSSH.a in Frameworks */ = {isa = PBXBuildFile; fileRef = 5DCACB8F33CDC322A6C60F78 /* libPods-LuloSSH.a */; };
 		13B07FBF1A68108700A75B9A /* Images.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 13B07FB51A68108700A75B9A /* Images.xcassets */; };
-		3F263EA959C03104CBF83776 /* LuloSSH/SshSession.swift in Sources */ = {isa = PBXBuildFile; fileRef = B81D16C01047B0C2FFBAC5F0 /* LuloSSH/SshSession.swift */; };
-		4F6F6BE835CBBD89AB45E40F /* LuloSSH/Vault.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA07BD6F981EA2CBC884BBD6 /* LuloSSH/Vault.swift */; };
-		7346C4EFF469B5815C87CAC2 /* null in Frameworks */ = {isa = PBXBuildFile; productRef = FD44D681A6A297A8C7454D91 /* XCSwiftPackageProductDependency */; };
+		3F263EA959C03104CBF83776 /* SshSession.swift in Sources */ = {isa = PBXBuildFile; fileRef = B81D16C01047B0C2FFBAC5F0 /* SshSession.swift */; };
+		4F6F6BE835CBBD89AB45E40F /* Vault.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA07BD6F981EA2CBC884BBD6 /* Vault.swift */; };
+		692FC001ED7CE723DFD4A71C /* ExpoModulesProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = B9B255587E47A6300D3E22D8 /* ExpoModulesProvider.swift */; };
+		7346C4EFF469B5815C87CAC2 /* Citadel in Frameworks */ = {isa = PBXBuildFile; productRef = FD44D681A6A297A8C7454D91 /* Citadel */; };
 		761780ED2CA45674006654EE /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 761780EC2CA45674006654EE /* AppDelegate.swift */; };
 		761780EF2CA45674006654EF /* SceneDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 761780EE2CA45674006654EF /* SceneDelegate.swift */; };
 		81AB9BB82411601600AC10FF /* LaunchScreen.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = 81AB9BB72411601600AC10FF /* LaunchScreen.storyboard */; };
 		ABAFB30080E6D53195AA5539 /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = 13B07FB81A68108700A75B9A /* PrivacyInfo.xcprivacy */; };
-		FF440A011EE22C537FC29360 /* LuloSSH/LuloSshBridge.m in Sources */ = {isa = PBXBuildFile; fileRef = 45283C950BC17F0B56E98CD7 /* LuloSSH/LuloSshBridge.m */; };
+		FF440A011EE22C537FC29360 /* LuloSshBridge.m in Sources */ = {isa = PBXBuildFile; fileRef = 45283C950BC17F0B56E98CD7 /* LuloSshBridge.m */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
-		0F70F2B08C351B9F2A00EA1E /* LuloSSH/LuloSSH-Bridging-Header.h */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.c.h; path = "LuloSSH/LuloSSH-Bridging-Header.h"; sourceTree = "<group>"; };
+		028CD94C7D0057765E6FB195 /* RsaSha2.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = RsaSha2.swift; path = LuloSSH/RsaSha2.swift; sourceTree = "<group>"; };
+		0F70F2B08C351B9F2A00EA1E /* LuloSSH-Bridging-Header.h */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.c.h; path = "LuloSSH/LuloSSH-Bridging-Header.h"; sourceTree = "<group>"; };
 		13B07F961A680F5B00A75B9A /* LuloSSH.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = LuloSSH.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		13B07FB51A68108700A75B9A /* Images.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; name = Images.xcassets; path = LuloSSH/Images.xcassets; sourceTree = "<group>"; };
 		13B07FB61A68108700A75B9A /* Info.plist */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.plist.xml; name = Info.plist; path = LuloSSH/Info.plist; sourceTree = "<group>"; };
 		13B07FB81A68108700A75B9A /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.plist.xml; name = PrivacyInfo.xcprivacy; path = LuloSSH/PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
 		3B4392A12AC88292D35C810B /* Pods-LuloSSH.debug.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-LuloSSH.debug.xcconfig"; path = "Target Support Files/Pods-LuloSSH/Pods-LuloSSH.debug.xcconfig"; sourceTree = "<group>"; };
-		45283C950BC17F0B56E98CD7 /* LuloSSH/LuloSshBridge.m */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.c.objc; path = LuloSSH/LuloSshBridge.m; sourceTree = "<group>"; };
+		45283C950BC17F0B56E98CD7 /* LuloSshBridge.m */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.c.objc; path = LuloSSH/LuloSshBridge.m; sourceTree = "<group>"; };
 		5709B34CF0A7D63546082F79 /* Pods-LuloSSH.release.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-LuloSSH.release.xcconfig"; path = "Target Support Files/Pods-LuloSSH/Pods-LuloSSH.release.xcconfig"; sourceTree = "<group>"; };
 		5DCACB8F33CDC322A6C60F78 /* libPods-LuloSSH.a */ = {isa = PBXFileReference; explicitFileType = archive.ar; includeInIndex = 0; path = "libPods-LuloSSH.a"; sourceTree = BUILT_PRODUCTS_DIR; };
 		761780EC2CA45674006654EE /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = AppDelegate.swift; path = LuloSSH/AppDelegate.swift; sourceTree = "<group>"; };
 		761780EE2CA45674006654EF /* SceneDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = SceneDelegate.swift; path = LuloSSH/SceneDelegate.swift; sourceTree = "<group>"; };
 		81AB9BB72411601600AC10FF /* LaunchScreen.storyboard */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = file.storyboard; name = LaunchScreen.storyboard; path = LuloSSH/LaunchScreen.storyboard; sourceTree = "<group>"; };
-		AA07BD6F981EA2CBC884BBD6 /* LuloSSH/Vault.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = LuloSSH/Vault.swift; sourceTree = "<group>"; };
-		B81D16C01047B0C2FFBAC5F0 /* LuloSSH/SshSession.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = LuloSSH/SshSession.swift; sourceTree = "<group>"; };
-		CAF5793695BE11F06A58C34F /* LuloSSH/LuloSsh.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = LuloSSH/LuloSsh.swift; sourceTree = "<group>"; };
+		AA07BD6F981EA2CBC884BBD6 /* Vault.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = LuloSSH/Vault.swift; sourceTree = "<group>"; };
+		B81D16C01047B0C2FFBAC5F0 /* SshSession.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = LuloSSH/SshSession.swift; sourceTree = "<group>"; };
+		B9B255587E47A6300D3E22D8 /* ExpoModulesProvider.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = ExpoModulesProvider.swift; path = "Pods/Target Support Files/Pods-LuloSSH/ExpoModulesProvider.swift"; sourceTree = "<group>"; };
+		CAF5793695BE11F06A58C34F /* LuloSsh.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = LuloSSH/LuloSsh.swift; sourceTree = "<group>"; };
 		ED297162215061F000B7C4FE /* JavaScriptCore.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = JavaScriptCore.framework; path = System/Library/Frameworks/JavaScriptCore.framework; sourceTree = SDKROOT; };
 /* End PBXFileReference section */
 
@@ -45,7 +49,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				0C80B921A6F3F58F76C31292 /* libPods-LuloSSH.a in Frameworks */,
-				7346C4EFF469B5815C87CAC2 /* null in Frameworks */,
+				7346C4EFF469B5815C87CAC2 /* Citadel in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -61,11 +65,28 @@
 				13B07FB61A68108700A75B9A /* Info.plist */,
 				81AB9BB72411601600AC10FF /* LaunchScreen.storyboard */,
 				13B07FB81A68108700A75B9A /* PrivacyInfo.xcprivacy */,
-				CAF5793695BE11F06A58C34F /* LuloSSH/LuloSsh.swift */,
-				45283C950BC17F0B56E98CD7 /* LuloSSH/LuloSshBridge.m */,
-				AA07BD6F981EA2CBC884BBD6 /* LuloSSH/Vault.swift */,
-				B81D16C01047B0C2FFBAC5F0 /* LuloSSH/SshSession.swift */,
-				0F70F2B08C351B9F2A00EA1E /* LuloSSH/LuloSSH-Bridging-Header.h */,
+				CAF5793695BE11F06A58C34F /* LuloSsh.swift */,
+				45283C950BC17F0B56E98CD7 /* LuloSshBridge.m */,
+				AA07BD6F981EA2CBC884BBD6 /* Vault.swift */,
+				B81D16C01047B0C2FFBAC5F0 /* SshSession.swift */,
+				0F70F2B08C351B9F2A00EA1E /* LuloSSH-Bridging-Header.h */,
+				028CD94C7D0057765E6FB195 /* RsaSha2.swift */,
+			);
+			name = LuloSSH;
+			sourceTree = "<group>";
+		};
+		1ECE314A5DDEBE4F5AEE3124 /* ExpoModulesProviders */ = {
+			isa = PBXGroup;
+			children = (
+				27BFFEB9C51CB0F0D0CB8330 /* LuloSSH */,
+			);
+			name = ExpoModulesProviders;
+			sourceTree = "<group>";
+		};
+		27BFFEB9C51CB0F0D0CB8330 /* LuloSSH */ = {
+			isa = PBXGroup;
+			children = (
+				B9B255587E47A6300D3E22D8 /* ExpoModulesProvider.swift */,
 			);
 			name = LuloSSH;
 			sourceTree = "<group>";
@@ -86,7 +107,7 @@
 			name = Libraries;
 			sourceTree = "<group>";
 		};
-		83CBB9F61A601CBA00E9B192 /* PBXGroup */ = {
+		83CBB9F61A601CBA00E9B192 = {
 			isa = PBXGroup;
 			children = (
 				13B07FAE1A68108700A75B9A /* LuloSSH */,
@@ -94,6 +115,7 @@
 				83CBBA001A601CBA00E9B192 /* Products */,
 				2D16E6871FA4F8E400B85C8A /* Frameworks */,
 				BBD78D7AC51CEA395F1C20DB /* Pods */,
+				1ECE314A5DDEBE4F5AEE3124 /* ExpoModulesProviders */,
 			);
 			indentWidth = 2;
 			sourceTree = "<group>";
@@ -125,6 +147,7 @@
 			buildConfigurationList = 13B07F931A680F5B00A75B9A /* Build configuration list for PBXNativeTarget "LuloSSH" */;
 			buildPhases = (
 				C38B50BA6285516D6DCD4F65 /* [CP] Check Pods Manifest.lock */,
+				C5B9F547B5796BCDC1F8CDCB /* [Expo] Configure project */,
 				13B07F871A680F5B00A75B9A /* Sources */,
 				13B07F8C1A680F5B00A75B9A /* Frameworks */,
 				13B07F8E1A680F5B00A75B9A /* Resources */,
@@ -138,7 +161,7 @@
 			);
 			name = LuloSSH;
 			packageProductDependencies = (
-				FD44D681A6A297A8C7454D91 /* XCSwiftPackageProductDependency */,
+				FD44D681A6A297A8C7454D91 /* Citadel */,
 			);
 			productName = LuloSSH;
 			productReference = 13B07F961A680F5B00A75B9A /* LuloSSH.app */;
@@ -147,7 +170,7 @@
 /* End PBXNativeTarget section */
 
 /* Begin PBXProject section */
-		83CBB9F71A601CBA00E9B192 = {
+		83CBB9F71A601CBA00E9B192 /* Project object */ = {
 			isa = PBXProject;
 			attributes = {
 				LastUpgradeCheck = 1210;
@@ -165,9 +188,9 @@
 				en,
 				Base,
 			);
-			mainGroup = 83CBB9F61A601CBA00E9B192 /* PBXGroup */;
+			mainGroup = 83CBB9F61A601CBA00E9B192;
 			packageReferences = (
-				580B5EFF71306EDB0A758B27 /* XCRemoteSwiftPackageReference */,
+				580B5EFF71306EDB0A758B27 /* XCRemoteSwiftPackageReference "Citadel" */,
 			);
 			productRefGroup = 83CBBA001A601CBA00E9B192 /* Products */;
 			projectDirPath = "";
@@ -247,6 +270,29 @@
 			shellScript = "diff \"${PODS_PODFILE_DIR_PATH}/Podfile.lock\" \"${PODS_ROOT}/Manifest.lock\" > /dev/null\nif [ $? != 0 ] ; then\n    # print error to STDERR\n    echo \"error: The sandbox is not in sync with the Podfile.lock. Run 'pod install' or update your CocoaPods installation.\" >&2\n    exit 1\nfi\n# This output is used by Xcode 'outputs' to avoid re-running this script phase.\necho \"SUCCESS\" > \"${SCRIPT_OUTPUT_FILE_0}\"\n";
 			showEnvVarsInLog = 0;
 		};
+		C5B9F547B5796BCDC1F8CDCB /* [Expo] Configure project */ = {
+			isa = PBXShellScriptBuildPhase;
+			alwaysOutOfDate = 1;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputFileListPaths = (
+			);
+			inputPaths = (
+				"$(SRCROOT)/.xcode.env",
+				"$(SRCROOT)/.xcode.env.local",
+				"$(SRCROOT)/Pods/Target Support Files/Pods-LuloSSH/expo-configure-project.sh",
+			);
+			name = "[Expo] Configure project";
+			outputFileListPaths = (
+			);
+			outputPaths = (
+				"$(SRCROOT)/Pods/Target Support Files/Pods-LuloSSH/ExpoModulesProvider.swift",
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "# This script configures Expo modules and generates the modules provider file.\nbash -l -c \"./Pods/Target\\ Support\\ Files/Pods-LuloSSH/expo-configure-project.sh\"\n";
+		};
 		E235C05ADACE081382539298 /* [CP] Copy Pods Resources */ = {
 			isa = PBXShellScriptBuildPhase;
 			buildActionMask = 2147483647;
@@ -273,10 +319,12 @@
 			files = (
 				761780ED2CA45674006654EE /* AppDelegate.swift in Sources */,
 				761780EF2CA45674006654EF /* SceneDelegate.swift in Sources */,
-				068F595BE9543CADB904EFFD /* LuloSSH/LuloSsh.swift in Sources */,
-				FF440A011EE22C537FC29360 /* LuloSSH/LuloSshBridge.m in Sources */,
-				4F6F6BE835CBBD89AB45E40F /* LuloSSH/Vault.swift in Sources */,
-				3F263EA959C03104CBF83776 /* LuloSSH/SshSession.swift in Sources */,
+				068F595BE9543CADB904EFFD /* LuloSsh.swift in Sources */,
+				FF440A011EE22C537FC29360 /* LuloSshBridge.m in Sources */,
+				4F6F6BE835CBBD89AB45E40F /* Vault.swift in Sources */,
+				3F263EA959C03104CBF83776 /* SshSession.swift in Sources */,
+				006BD5F9915423D1E9C36237 /* RsaSha2.swift in Sources */,
+				692FC001ED7CE723DFD4A71C /* ExpoModulesProvider.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -303,6 +351,7 @@
 					"-ObjC",
 					"-lc++",
 				);
+				OTHER_SWIFT_FLAGS = "$(inherited) -D EXPO_CONFIGURATION_DEBUG";
 				PRODUCT_BUNDLE_IDENTIFIER = com.citters.lulossh;
 				PRODUCT_NAME = LuloSSH;
 				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
@@ -333,6 +382,7 @@
 					"-ObjC",
 					"-lc++",
 				);
+				OTHER_SWIFT_FLAGS = "$(inherited) -D EXPO_CONFIGURATION_RELEASE";
 				PRODUCT_BUNDLE_IDENTIFIER = com.citters.lulossh;
 				PRODUCT_NAME = LuloSSH;
 				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
@@ -421,8 +471,8 @@
 				REACT_NATIVE_PATH = "${PODS_ROOT}/../../node_modules/react-native";
 				SDKROOT = iphoneos;
 				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "$(inherited) DEBUG";
-				USE_HERMES = true;
 				SWIFT_VERSION = 5.0;
+				USE_HERMES = true;
 			};
 			name = Debug;
 		};
@@ -495,9 +545,9 @@
 				PODFILE_DIR = "$(SRCROOT)";
 				REACT_NATIVE_PATH = "${PODS_ROOT}/../../node_modules/react-native";
 				SDKROOT = iphoneos;
+				SWIFT_VERSION = 5.0;
 				USE_HERMES = true;
 				VALIDATE_PRODUCT = YES;
-				SWIFT_VERSION = 5.0;
 			};
 			name = Release;
 		};
@@ -525,7 +575,7 @@
 /* End XCConfigurationList section */
 
 /* Begin XCRemoteSwiftPackageReference section */
-		580B5EFF71306EDB0A758B27 /* XCRemoteSwiftPackageReference */ = {
+		580B5EFF71306EDB0A758B27 /* XCRemoteSwiftPackageReference "Citadel" */ = {
 			isa = XCRemoteSwiftPackageReference;
 			repositoryURL = "https://github.com/orlandos-nl/Citadel.git";
 			requirement = {
@@ -536,12 +586,12 @@
 /* End XCRemoteSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
-		FD44D681A6A297A8C7454D91 /* XCSwiftPackageProductDependency */ = {
+		FD44D681A6A297A8C7454D91 /* Citadel */ = {
 			isa = XCSwiftPackageProductDependency;
-			package = 580B5EFF71306EDB0A758B27 /* XCRemoteSwiftPackageReference */;
+			package = 580B5EFF71306EDB0A758B27 /* XCRemoteSwiftPackageReference "Citadel" */;
 			productName = Citadel;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};
-	rootObject = 83CBB9F71A601CBA00E9B192;
+	rootObject = 83CBB9F71A601CBA00E9B192 /* Project object */;
 }

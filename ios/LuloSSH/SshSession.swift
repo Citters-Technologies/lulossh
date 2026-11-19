@@ -134,7 +134,8 @@ enum KeyTools {
     func auth(user: String) -> SSHAuthenticationMethod {
       switch self {
       case .ed25519(let k): return .ed25519(username: user, privateKey: k)
-      case .rsa(let k): return .rsa(username: user, privateKey: k)
+      // rsa-sha2-512 primero (OpenSSH moderno), ssh-rsa como reserva.
+      case .rsa(let k): return .custom(RsaKeyAuth(user: user, key: k))
       }
     }
   }
