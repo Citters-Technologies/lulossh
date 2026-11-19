@@ -1,4 +1,18 @@
 {
   "name": "LuloSSH",
-  "displayName": "LuloSSH"
+  "displayName": "LuloSSH",
+  "expo": {
+    "name": "LuloSSH",
+    "slug": "lulossh",
+    "version": "0.1.0",
+    "orientation": "default",
+    "userInterfaceStyle": "automatic",
+    "ios": {
+      "bundleIdentifier": "com.citters.lulossh",
+      "supportsTablet": true
+    },
+    "android": {
+      "package": "com.citters.lulossh"
+    }
+  }
 }

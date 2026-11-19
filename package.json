@@ -3,10 +3,10 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "android": "react-native run-android",
-    "ios": "react-native run-ios",
+    "android": "expo run:android",
+    "ios": "expo run:ios",
     "lint": "eslint .",
-    "start": "react-native start",
+    "start": "expo start",
     "test": "jest",
     "postinstall": "node scripts/build-terminal.js",
     "build:terminal": "node scripts/build-terminal.js",
@@ -46,5 +46,6 @@
   },
   "engines": {
     "node": ">= 22.11.0"
-  }
+  },
+  "main": "index.js"
 }
