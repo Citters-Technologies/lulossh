@@ -154,12 +154,16 @@ export default function App() {
       return;
     }
     const cur = panesRef.current;
+    const count = paneCount(layoutRef.current);
     const at = cur.findIndex(x => x?.sessionId === t.sessionId);
-    if (at >= 0) {
+    if (at >= 0 && at < count) {
+      // Ya está a la vista: solo activar su panel.
       setActivePane(at);
     } else {
+      // Al panel activo. Si estaba en uno que no cabe en la distribución
+      // actual, se mueve (no se queda duplicada).
       const i = activePaneRef.current;
-      setPanes(ps => ps.map((x, j) => (j === i ? t : x)));
+      setPanes(ps => ps.map((x, j) => (j === i ? t : j === at ? null : x)));
     }
     setRoute({ name: 'hosts' });
   }, []);
