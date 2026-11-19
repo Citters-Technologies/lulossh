@@ -170,6 +170,9 @@ export default function App() {
   const toggleSideRef = useRef(() => {});
   toggleSideRef.current = toggleSide;
 
+  /** Sesiones cuya terminal ya se montó alguna vez en un panel. */
+  const mountedSessions = useRef(new Set<string>());
+
   const closePane = (i: number) =>
     setPanes(ps => ps.map((x, j) => (j === i ? null : x)));
   const setLocked = (v: boolean) => {
@@ -605,33 +608,47 @@ export default function App() {
                     panes={panes}
                     active={activePane}
                     onActivate={setActivePane}
-                    renderPane={(i, pn, isActive, shownPane) => (
-                      <TerminalScreen
-                        key={pn.sessionId}
-                        host={pn.host}
-                        sessionId={pn.sessionId}
-                        resume={pn.resume}
-                        onClose={() => closePane(i)}
-                        onHostKeyAccepted={fp =>
-                          store
-                            .patchHost(pn.host.id, { fingerprint: fp })
-                            .catch(() => {})
-                        }
-                        onOsDetected={os =>
-                          store.patchHost(pn.host.id, { os }).catch(() => {})
-                        }
-                        inPane
-                        active={isActive}
-                        onActivate={() => setActivePane(i)}
-                        keyboardPad={false}
-                        visible={paneOn && shownPane}
-                        onShowSide={
-                          sideHidden && (i === 0 || i === 2)
-                            ? toggleSide
-                            : undefined
-                        }
-                      />
-                    )}
+                    renderPane={(i, pn, isActive, shownPane) => {
+                      const firstMount = !mountedSessions.current.has(
+                        pn.sessionId,
+                      );
+                      const el = (
+                        <TerminalScreen
+                          key={pn.sessionId}
+                          host={pn.host}
+                          sessionId={pn.sessionId}
+                          // Ya se abrió antes (p. ej. panel que se ocultó y
+                          // vuelve): restaurar en lugar de conectar de nuevo.
+                          resume={
+                            pn.resume ||
+                            mountedSessions.current.has(pn.sessionId)
+                          }
+                          onClose={() => closePane(i)}
+                          onHostKeyAccepted={fp =>
+                            store
+                              .patchHost(pn.host.id, { fingerprint: fp })
+                              .catch(() => {})
+                          }
+                          onOsDetected={os =>
+                            store.patchHost(pn.host.id, { os }).catch(() => {})
+                          }
+                          inPane
+                          active={isActive}
+                          onActivate={() => setActivePane(i)}
+                          keyboardPad={false}
+                          visible={paneOn && shownPane}
+                          onShowSide={
+                            sideHidden && (i === 0 || i === 2)
+                              ? toggleSide
+                              : undefined
+                          }
+                        />
+                      );
+                      if (firstMount) {
+                        mountedSessions.current.add(pn.sessionId);
+                      }
+                      return el;
+                    }}
                   />
                 </>
               ) : (

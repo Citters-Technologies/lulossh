@@ -72,8 +72,8 @@ function rects(layout: PaneLayout, w: number, h: number): Rect[] {
 /**
  * Hasta 4 terminales en pantalla. Los paneles están siempre en la misma
  * posición del árbol (posicionados en absoluto), así que cambiar de
- * distribución no desmonta ni reconecta ninguna terminal; los que no caben
- * se ocultan con su sesión intacta.
+ * distribución no desmonta las terminales que siguen a la vista; las que no
+ * caben se descargan y su sesión sigue viva para cuando vuelvan.
  */
 export function Workspace({
   layout,
@@ -124,7 +124,12 @@ export function Workspace({
             ]}
           >
             {pane ? (
-              renderPane(i, pane, isActive, visible)
+              // Un panel que no cabe en la distribución no tiene terminal
+              // cargada (ahorra memoria); su sesión sigue viva en nativo y
+              // al volver se repinta desde el historial.
+              visible ? (
+                renderPane(i, pane, isActive, visible)
+              ) : null
             ) : (
               <Pressable style={local.empty} onPress={() => onActivate(i)}>
                 <Text style={local.emptyTitle}>Panel vacío</Text>
