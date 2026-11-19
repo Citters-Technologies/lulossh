@@ -160,10 +160,24 @@ export default function App() {
       // Ya está a la vista: solo activar su panel.
       setActivePane(at);
     } else {
-      // Al panel activo. Si estaba en uno que no cabe en la distribución
-      // actual, se mueve (no se queda duplicada).
+      // Al panel activo. La que estaba ahí no se pierde: ocupa el hueco que
+      // deja la nueva (intercambio) o un panel libre de los que no caben,
+      // y vuelve a verse al pasar a una distribución con más paneles.
       const i = activePaneRef.current;
-      setPanes(ps => ps.map((x, j) => (j === i ? t : j === at ? null : x)));
+      setPanes(ps => {
+        const next = ps.slice();
+        const old = next[i];
+        next[i] = t;
+        if (at >= 0) {
+          next[at] = old;
+        } else if (old && old.sessionId !== t.sessionId) {
+          const free = next.findIndex((x, j) => j >= count && !x);
+          if (free >= 0) {
+            next[free] = old;
+          }
+        }
+        return next;
+      });
     }
     setRoute({ name: 'hosts' });
   }, []);
