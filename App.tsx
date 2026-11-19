@@ -41,6 +41,7 @@ import {
 } from './src/ui/SplitPanes';
 
 const JUICE_PREF = 'juiceImport';
+const SIDE_PREF = 'splitSide';
 
 const appStyles = StyleSheet.create({
   blank: { flex: 1, backgroundColor: colors.bg },
@@ -84,6 +85,18 @@ export default function App() {
   const home = () => setRoute({ name: 'hosts' });
   // Tablet: lista a la izquierda y terminal a la derecha.
   const split = useSplitLayout();
+  // Ocultar la lista para centrarse en la terminal (se recuerda).
+  const [sideHidden, setSideHidden] = useState(false);
+  useEffect(() => {
+    Ssh.prefGet(SIDE_PREF)
+      .then(v => setSideHidden(v === 'hidden'))
+      .catch(() => {});
+  }, []);
+  const toggleSide = () =>
+    setSideHidden(h => {
+      Ssh.prefSet(SIDE_PREF, h ? 'shown' : 'hidden').catch(() => {});
+      return !h;
+    });
   const setLocked = (v: boolean) => {
     if (v) {
       // La terminal se desmonta mientras está bloqueado: al volver, restaurar
@@ -429,6 +442,7 @@ export default function App() {
             store.patchHost(route.host.id, { os }).catch(() => {})
           }
           inPane={paneOn}
+          onShowSide={paneOn && sideHidden ? toggleSide : undefined}
         />
       );
       break;
@@ -445,7 +459,9 @@ export default function App() {
           <View
             style={
               paneOn
-                ? appStyles.side
+                ? sideHidden && route.name === 'terminal'
+                  ? appStyles.hidden
+                  : appStyles.side
                 : route.name === 'hosts'
                 ? appStyles.fill
                 : appStyles.hidden
@@ -466,6 +482,8 @@ export default function App() {
                 current={route.sessionId}
                 currentTitle={route.host.name}
                 onOpen={openLive}
+                sideHidden={sideHidden}
+                onToggleSide={toggleSide}
               />
             )}
             {paneOn && route.name === 'hosts' && (

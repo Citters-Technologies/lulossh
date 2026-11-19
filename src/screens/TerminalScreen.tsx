@@ -3,6 +3,7 @@ import {
   Alert,
   AppState,
   Keyboard,
+  PanResponder,
   Pressable,
   StyleSheet,
   View,
@@ -47,6 +48,7 @@ export function TerminalScreen({
   onHostKeyAccepted,
   onOsDetected,
   inPane = false,
+  onShowSide,
 }: {
   host: Host;
   /**
@@ -64,7 +66,24 @@ export function TerminalScreen({
   onOsDetected?(os: string): void;
   /** Panel derecho de la tablet (debajo de las pestañas de sesiones). */
   inPane?: boolean;
+  /**
+   * Tablet con la lista oculta: botón 🏠 a la izquierda y deslizar desde el
+   * borde izquierdo para volver a mostrarla.
+   */
+  onShowSide?(): void;
 }) {
+  const showSideRef = useRef(onShowSide);
+  showSideRef.current = onShowSide;
+  const edgePan = useRef(
+    PanResponder.create({
+      onStartShouldSetPanResponder: () => true,
+      onPanResponderRelease: (_e, g) => {
+        if (g.dx > 40 && Math.abs(g.dy) < 80) {
+          showSideRef.current?.();
+        }
+      },
+    }),
+  ).current;
   const term = useRef<TerminalHandle>(null);
   const sessionId = useRef(initialId);
   const connected = useRef(false);
@@ -534,6 +553,22 @@ export function TerminalScreen({
             </Pressable>
           </View>
         )}
+        {onShowSide && (
+          <>
+            <View style={styles.edge} {...edgePan.panHandlers} />
+            <Pressable
+              onPress={onShowSide}
+              hitSlop={8}
+              accessibilityLabel="Mostrar la lista de hosts"
+              style={({ pressed }) => [
+                styles.homeBtn,
+                pressed && styles.aiBtnPressed,
+              ]}
+            >
+              <Text style={styles.homeGlyph}>🏠</Text>
+            </Pressable>
+          </>
+        )}
         {aiTools.length > 0 && (
           <View style={styles.aiBar} pointerEvents="box-none">
             {aiTools.map(t => (
@@ -635,6 +670,23 @@ const styles = StyleSheet.create({
     opacity: 0.45,
   },
   aiBtnPressed: { opacity: 1 },
+  homeBtn: {
+    position: 'absolute',
+    top: 8,
+    left: 8,
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    borderWidth: 1,
+    borderColor: colors.muted,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(11,15,20,0.55)',
+    opacity: 0.6,
+  },
+  homeGlyph: { fontSize: 16 },
+  // Franja invisible del borde izquierdo para el gesto de deslizar.
+  edge: { position: 'absolute', top: 52, bottom: 0, left: 0, width: 18 },
   selBar: {
     position: 'absolute',
     top: 8,

@@ -31,12 +31,17 @@ export function SessionTabs({
   current,
   currentTitle,
   onOpen,
+  sideHidden,
+  onToggleSide,
 }: {
   live: LiveSession[];
   current: string;
   /** Título de la sesión actual si aún no aparece en `live` (conectando). */
   currentTitle: string;
   onOpen(s: LiveSession): void;
+  /** Panel lateral oculto: la terminal ocupa toda la pantalla. */
+  sideHidden: boolean;
+  onToggleSide(): void;
 }) {
   const tabs = live.some(s => s.sessionId === current)
     ? live
@@ -45,7 +50,20 @@ export function SessionTabs({
         { sessionId: current, hostId: null, title: currentTitle, startedAt: 0 },
       ];
   return (
-    <SafeAreaView edges={['top', 'right']} style={local.bar}>
+    <SafeAreaView
+      edges={sideHidden ? ['top', 'left', 'right'] : ['top', 'right']}
+      style={[local.bar, local.barRow]}
+    >
+      <Pressable
+        onPress={onToggleSide}
+        hitSlop={8}
+        style={({ pressed }) => [local.sideBtn, pressed && local.pressed]}
+        accessibilityLabel={
+          sideHidden ? 'Mostrar la lista' : 'Ocultar la lista'
+        }
+      >
+        <Text style={local.sideBtnText}>{sideHidden ? '☰' : '⟨'}</Text>
+      </Pressable>
       <ScrollView
         horizontal
         showsHorizontalScrollIndicator={false}
@@ -106,7 +124,18 @@ const local = StyleSheet.create({
     borderBottomWidth: StyleSheet.hairlineWidth,
     borderBottomColor: colors.surface2,
   },
+  barRow: { flexDirection: 'row', alignItems: 'center' },
   row: { paddingHorizontal: 8, paddingVertical: 6, gap: 6 },
+  sideBtn: {
+    marginLeft: 8,
+    width: 36,
+    height: 34,
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: colors.surface,
+  },
+  sideBtnText: { color: colors.strong, fontSize: 18, fontWeight: '700' },
   tab: {
     flexDirection: 'row',
     alignItems: 'center',
