@@ -143,7 +143,7 @@ export function SettingsScreen({
   };
 
   // Modo claro/oscuro: los estilos se crean al arrancar, así que aplicarlo
-  // exige reiniciar la interfaz (y eso cierra las sesiones abiertas).
+  // exige reiniciar la interfaz (las sesiones siguen abiertas).
   const [appTheme, setAppTheme] = useState<AppThemeMode>(appThemeMode);
   const chooseAppTheme = async (mode: AppThemeMode) => {
     if (mode === appTheme) {
@@ -154,21 +154,8 @@ export function SettingsScreen({
     if (mode === appThemeMode) {
       return; // vuelve al que está aplicado: nada que reiniciar
     }
-    const open = (await Ssh.listSessions().catch(() => [])).length;
-    if (!open) {
-      Ssh.reloadUi();
-      return;
-    }
-    Alert.alert(
-      'Reiniciar la interfaz',
-      `Para aplicar el modo hay que reiniciar la interfaz, y eso cierra ${
-        open === 1 ? 'la sesión abierta' : `las ${open} sesiones abiertas`
-      }.`,
-      [
-        { text: 'Más tarde', style: 'cancel' },
-        { text: 'Reiniciar ahora', onPress: () => Ssh.reloadUi() },
-      ],
-    );
+    // Las sesiones siguen abiertas tras la recarga.
+    Ssh.reloadUi();
   };
 
   useEffect(() => setPwError(null), [pw?.mode]);

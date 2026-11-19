@@ -92,10 +92,13 @@ class SshModule(private val rc: ReactApplicationContext) : ReactContextBaseJavaM
         if (sessions.isNotEmpty()) syncService()
     }
 
-    private val sessions = ConcurrentHashMap<String, Sess>()
-    private val pendingHostKeys = ConcurrentHashMap<String, CompletableFuture<Boolean>>()
-    private val connecting = ConcurrentHashMap<String, SSHClient>()
-    private val pool = Executors.newCachedThreadPool()
+    // Las sesiones viven en el proceso (companion), no en esta instancia: al
+    // recargar la interfaz (cambio de tema, recarga en desarrollo) se crea un
+    // módulo nuevo y las conexiones siguen abiertas y localizables.
+    private val sessions get() = liveSessions
+    private val pendingHostKeys get() = livePendingHostKeys
+    private val connecting get() = liveConnecting
+    private val pool get() = sharedPool
     private val vault by lazy { KeyVault(rc) }
 
     override fun getName() = "LuloSsh"
@@ -106,8 +109,18 @@ class SshModule(private val rc: ReactApplicationContext) : ReactContextBaseJavaM
         java.security.Security.insertProviderAt(org.bouncycastle.jce.provider.BouncyCastleProvider(), 1)
     }
 
+    init {
+        current = this
+    }
+
+    /** Eventos a la interfaz actual (la del último módulo creado). */
     private fun emit(event: String, map: WritableMap) {
-        rc.getJSModule(DeviceEventManagerModule.RCTDeviceEventEmitter::class.java).emit(event, map)
+        val ctx = current?.rc ?: rc
+        try {
+            ctx.getJSModule(DeviceEventManagerModule.RCTDeviceEventEmitter::class.java).emit(event, map)
+        } catch (_: Exception) {
+            // Interfaz recargándose: el evento se pierde, la sesión no.
+        }
     }
 
     private val uiPrefs by lazy { rc.getSharedPreferences("lulossh_ui", android.content.Context.MODE_PRIVATE) }
@@ -126,7 +139,7 @@ class SshModule(private val rc: ReactApplicationContext) : ReactContextBaseJavaM
      */
     @ReactMethod
     fun reloadUi() {
-        sessions.keys.toList().forEach { closeSession(it) }
+        // Las sesiones sobreviven a la recarga (ver liveSessions).
         android.os.Handler(android.os.Looper.getMainLooper()).post {
             (rc.applicationContext as? com.facebook.react.ReactApplication)
                 ?.reactHost?.reload("Cambio de tema")
@@ -502,6 +515,13 @@ class SshModule(private val rc: ReactApplicationContext) : ReactContextBaseJavaM
     private class ConnectFailure(msg: String, cause: Throwable) : Exception(msg, cause)
 
     private companion object {
+        private val liveSessions = ConcurrentHashMap<String, Sess>()
+        private val livePendingHostKeys = ConcurrentHashMap<String, CompletableFuture<Boolean>>()
+        private val liveConnecting = ConcurrentHashMap<String, SSHClient>()
+        private val sharedPool: java.util.concurrent.ExecutorService = Executors.newCachedThreadPool()
+
+        @Volatile private var current: SshModule? = null
+
         const val CONNECT_TIMEOUT_MS = 15_000
         const val HOSTKEY_WAIT_MS = 120_000
         const val HISTORY_BYTES = 256 * 1024
@@ -557,6 +577,7 @@ class SshModule(private val rc: ReactApplicationContext) : ReactContextBaseJavaM
     }
 
     override fun invalidate() {
+        if (current === this) current = null
         try {
             rc.getSystemService(android.net.ConnectivityManager::class.java)
                 ?.unregisterNetworkCallback(netCallback)

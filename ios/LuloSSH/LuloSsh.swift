@@ -9,11 +9,34 @@ import UIKit
 /// Implementa el contrato de src/native/SshModule.ts (versión iOS).
 @objc(LuloSsh)
 final class LuloSsh: RCTEventEmitter {
-  private let lock = NSLock()
-  private var sessions: [String: SshSession] = [:]
+  // Estado de las sesiones a nivel de proceso (static): al recargar la
+  // interfaz se crea un módulo nuevo y las conexiones siguen abiertas.
+  private static let sharedLock = NSLock()
+  private static var liveSessions: [String: SshSession] = [:]
+  private static var liveConnecting: Set<String> = []
+  private static var livePendingHostKeys: [String: EventLoopPromise<Void>] = [:]
+  /// Módulo de la interfaz actual (recibe los eventos).
+  private static weak var current: LuloSsh?
+
+  private var lock: NSLock { Self.sharedLock }
+  private var sessions: [String: SshSession] {
+    get { Self.liveSessions }
+    set { Self.liveSessions = newValue }
+  }
   /// Conexiones en curso; disconnect() las borra para abortar.
-  private var connecting: Set<String> = []
-  private var pendingHostKeys: [String: EventLoopPromise<Void>] = [:]
+  private var connecting: Set<String> {
+    get { Self.liveConnecting }
+    set { Self.liveConnecting = newValue }
+  }
+  private var pendingHostKeys: [String: EventLoopPromise<Void>] {
+    get { Self.livePendingHostKeys }
+    set { Self.livePendingHostKeys = newValue }
+  }
+
+  override init() {
+    super.init()
+    Self.current = self
+  }
   private let vault = Vault()
   private let prefs = UserDefaults(suiteName: "lulossh_ui") ?? .standard
 
@@ -32,7 +55,7 @@ final class LuloSsh: RCTEventEmitter {
   }
 
   private func emit(_ name: String, _ body: [String: Any]) {
-    sendEvent(withName: name, body: body)
+    (Self.current ?? self).sendEvent(withName: name, body: body)
   }
 
   private func locked<T>(_ f: () -> T) -> T {
@@ -427,7 +450,7 @@ final class LuloSsh: RCTEventEmitter {
 
   /// Recarga JS para aplicar el modo claro/oscuro (cierra antes las sesiones).
   @objc func reloadUi() {
-    for id in locked({ Array(sessions.keys) }) { closeSession(id, nil) }
+    // Las sesiones sobreviven a la recarga (estado static).
     DispatchQueue.main.async { RCTTriggerReloadCommandListeners("Cambio de tema") }
   }
 
