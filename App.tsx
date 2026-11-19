@@ -45,6 +45,7 @@ import {
   paneCount,
   PaneLayout,
   PaneSession,
+  visiblePanes,
   Workspace,
 } from './src/ui/Workspace';
 
@@ -139,7 +140,8 @@ export default function App() {
   }, []);
   const setPaneLayout = (l: PaneLayout) => {
     setPaneLayoutState(l);
-    setActivePane(a => (a < paneCount(l) ? a : 0));
+    // Con un solo panel se amplía el activo, sea cual sea.
+    setActivePane(a => (l === 'single' || a < paneCount(l) ? a : 0));
     Ssh.prefSet(PANES_PREF, l).catch(() => {});
   };
   const anyPane = panes.some(Boolean);
@@ -156,8 +158,9 @@ export default function App() {
     const cur = panesRef.current;
     const count = paneCount(layoutRef.current);
     const at = cur.findIndex(x => x?.sessionId === t.sessionId);
-    if (at >= 0 && at < count) {
-      // Ya está a la vista: solo activar su panel.
+    if (at >= 0 && (count === 1 || at < count)) {
+      // Ya tiene panel: activarlo. Con un solo panel es un "zoom" sobre el
+      // activo, así que basta con cambiar cuál se amplía.
       setActivePane(at);
     } else {
       // Al panel activo. La que estaba ahí no se pierde: ocupa el hueco que
@@ -171,7 +174,9 @@ export default function App() {
         if (at >= 0) {
           next[at] = old;
         } else if (old && old.sessionId !== t.sessionId) {
-          const free = next.findIndex((x, j) => j >= count && !x);
+          const free = next.findIndex(
+            (x, j) => !x && !visiblePanes(layoutRef.current, i).includes(j),
+          );
           if (free >= 0) {
             next[free] = old;
           }
@@ -283,7 +288,12 @@ export default function App() {
         cycle(a === 'nextPane' ? 1 : -1);
       } else if (a.startsWith('pane')) {
         const n = Number(a.slice(4)) - 1;
-        if (splitRef.current && n < paneCount(layoutRef.current)) {
+        // Con un solo panel, Ctrl+Shift+N amplía el panel N.
+        const max =
+          layoutRef.current === 'single'
+            ? MAX_PANES
+            : paneCount(layoutRef.current);
+        if (splitRef.current && n < max) {
           setActivePane(n);
         }
       } else if (a === 'toggleSide' && splitRef.current) {
@@ -616,9 +626,8 @@ export default function App() {
                     onToggleSide={toggleSide}
                     layout={paneLayout}
                     onLayoutChange={setPaneLayout}
-                    shown={panes
-                      .slice(0, paneCount(paneLayout))
-                      .map(x => x?.sessionId ?? '')
+                    shown={visiblePanes(paneLayout, activePane)
+                      .map(j => panes[j]?.sessionId ?? '')
                       .filter(Boolean)}
                   />
                   <Workspace

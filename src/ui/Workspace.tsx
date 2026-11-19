@@ -22,6 +22,16 @@ export function paneCount(layout: PaneLayout): number {
   return layout === 'single' ? 1 : layout === 'grid' ? 4 : 2;
 }
 
+/**
+ * Paneles a la vista, en orden de posición. En 'single' se ve el activo a
+ * pantalla completa (un "zoom": la colocación de los demás no cambia).
+ */
+export function visiblePanes(layout: PaneLayout, active: number): number[] {
+  return layout === 'single'
+    ? [active]
+    : Array.from({ length: paneCount(layout) }, (_, i) => i);
+}
+
 /** Sesión mostrada en un panel. */
 export interface PaneSession {
   host: Host;
@@ -98,6 +108,7 @@ export function Workspace({
   // terminal, que encogería también las de arriba).
   const keyboardHeight = useKeyboardHeight();
   const count = paneCount(layout);
+  const slots = visiblePanes(layout, active);
   const r = size.w ? rects(layout, size.w, size.h) : [];
   const multi = count > 1;
   return (
@@ -111,7 +122,8 @@ export function Workspace({
       }
     >
       {Array.from({ length: MAX_PANES }, (_, i) => {
-        const visible = i < count && !!r[i];
+        const pos = slots.indexOf(i);
+        const visible = pos >= 0 && !!r[pos];
         const pane = panes[i];
         const isActive = !multi || i === active;
         return (
@@ -119,7 +131,7 @@ export function Workspace({
             key={i}
             style={[
               local.pane,
-              visible ? r[i] : local.hidden,
+              visible ? r[pos] : local.hidden,
               multi && (isActive ? local.paneOn : local.paneOff),
             ]}
           >
