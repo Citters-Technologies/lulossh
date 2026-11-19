@@ -170,7 +170,7 @@ export default function App() {
       setPanes(ps => {
         const next = ps.slice();
         const old = next[i];
-        next[i] = t;
+        next[i] = { ...t, key: t.key ?? t.sessionId };
         if (at >= 0) {
           next[at] = old;
         } else if (old && old.sessionId !== t.sessionId) {
@@ -641,7 +641,7 @@ export default function App() {
                       );
                       const el = (
                         <TerminalScreen
-                          key={pn.sessionId}
+                          key={pn.key ?? pn.sessionId}
                           host={pn.host}
                           sessionId={pn.sessionId}
                           // Ya se abrió antes (p. ej. panel que se ocultó y
@@ -663,6 +663,18 @@ export default function App() {
                           active={isActive}
                           onActivate={() => setActivePane(i)}
                           keyboardPad={false}
+                          onSessionChange={id => {
+                            mountedSessions.current.add(id);
+                            setPanes(ps =>
+                              ps.map(x =>
+                                x &&
+                                (x.key ?? x.sessionId) ===
+                                  (pn.key ?? pn.sessionId)
+                                  ? { ...x, sessionId: id, resume: true }
+                                  : x,
+                              ),
+                            );
+                          }}
                           visible={paneOn && shownPane}
                           onShowSide={
                             sideHidden && (i === 0 || i === 2)

@@ -63,6 +63,7 @@ export function TerminalScreen({
   onActivate,
   keyboardPad = true,
   visible = true,
+  onSessionChange,
 }: {
   host: Host;
   /**
@@ -96,6 +97,11 @@ export function TerminalScreen({
    * salida se acumula y se pinta de golpe al volver (ahorra CPU y batería).
    */
   visible?: boolean;
+  /**
+   * Reconectar abre una sesión nueva (otro id). Quien guarde el id (paneles
+   * de la tablet) debe actualizarlo, o al volver a montar buscaría la vieja.
+   */
+  onSessionChange?(sessionId: string): void;
 }) {
   const activeRef = useRef(active);
   activeRef.current = active;
@@ -484,6 +490,7 @@ export function TerminalScreen({
     setCanReconnect(false);
     setAiTools([]);
     sessionId.current = newId();
+    onSessionChange?.(sessionId.current);
     replaying.current = false;
     term.current?.write(toBase64('\r\n\x1b[2mReconectando…\x1b[0m\r\n'));
     setStatus('Conectando…');

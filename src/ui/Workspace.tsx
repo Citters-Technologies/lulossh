@@ -38,6 +38,11 @@ export interface PaneSession {
   sessionId: string;
   /** true: la sesión ya existe en segundo plano y se restaura. */
   resume: boolean;
+  /**
+   * Identidad estable del terminal del panel (no cambia al reconectar, que
+   * da otro sessionId), para no desmontarlo.
+   */
+  key?: string;
 }
 
 interface Rect {
