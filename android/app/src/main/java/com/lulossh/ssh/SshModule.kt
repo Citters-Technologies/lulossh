@@ -487,6 +487,7 @@ class SshModule(private val rc: ReactApplicationContext) : ReactContextBaseJavaM
                 syncService(id)
                 promise.resolve(id)
             } catch (e: Exception) {
+                android.util.Log.w("LuloSSH", "connect $host:$port", e)
                 connecting.remove(id)
                 try { client.disconnect() } catch (_: Exception) {}
                 when (e) {

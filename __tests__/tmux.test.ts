@@ -22,7 +22,7 @@ describe('tmux', () => {
     const cmd = tmuxCommand({ tmuxSession: 'devin' });
     expect(cmd.startsWith(' ')).toBe(true); // fuera del historial
     expect(cmd).toContain(
-      String.raw`exec tmux new-session -A -s devin \; set-option mouse on`,
+      String.raw`exec tmux new-session -A -s devin \; set-option mouse on \; set-option -wq window-size latest`,
     );
     expect(cmd.endsWith('\r')).toBe(true);
   });

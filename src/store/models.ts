@@ -54,12 +54,14 @@ export function tmuxSessionName(h: Pick<Host, 'tmuxSession'>): string {
  * Lo que se escribe en la shell al conectar para entrar en tmux. Empieza con
  * espacio para no quedar en el historial (HISTCONTROL=ignorespace) y activa
  * el ratón en esa sesión para que el desplazamiento táctil recorra el
- * historial de tmux. Sin tmux instalado, avisa y se queda en la shell.
+ * historial de tmux. Con varios dispositivos enganchados (móvil y tablet), la
+ * ventana toma el tamaño del último que se usa ('-q': sin error en tmux
+ * antiguos que no tienen la opción). Sin tmux instalado, avisa y se queda en la shell.
  */
 export function tmuxCommand(h: Pick<Host, 'tmuxSession'>): string {
   const n = tmuxSessionName(h);
   return (
-    ` command -v tmux >/dev/null 2>&1 && exec tmux new-session -A -s ${n} \\; set-option mouse on` +
+    ` command -v tmux >/dev/null 2>&1 && exec tmux new-session -A -s ${n} \\; set-option mouse on \\; set-option -wq window-size latest` +
     ` || echo "LuloSSH: tmux no está instalado en este servidor (p. ej. sudo apt install tmux)"\r`
   );
 }
