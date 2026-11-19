@@ -151,7 +151,7 @@ export function ImportSection({ store }: { store: Store }) {
   return (
     <>
       <Row
-        icon="⇪"
+        icon="🗂️"
         title={busy ? 'Importando…' : 'Importar de Xshell'}
         sub="Máquinas, grupos, claves y contraseñas (.xts, .zip, .xsh, OpenSSH/.pem)"
         disabled={busy}
@@ -159,7 +159,7 @@ export function ImportSection({ store }: { store: Store }) {
       />
       {juiceInstalled && (
         <Row
-          icon="⇪"
+          icon="🧃"
           title="Importar de JuiceSSH"
           sub="Máquinas y grupos de JuiceSSH (su API no expone claves ni contraseñas)"
           disabled={busy}

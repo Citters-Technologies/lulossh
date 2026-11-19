@@ -273,25 +273,46 @@ export function SettingsScreen({
       icon: '🌓',
       title: 'Apariencia',
       body: (
-        <View style={local.card}>
-          <View style={local.line}>
-            <Text style={local.icon}>🌓</Text>
-            <View style={local.lineText}>
-              <Text style={local.title}>Modo de la app</Text>
-              <Text style={local.sub}>
-                Colores de las pantallas. Los de la consola se eligen en
-                Terminal → Tema de color.
-              </Text>
+        <>
+          <View style={local.card}>
+            <View style={local.line}>
+              <Text style={local.icon}>🌓</Text>
+              <View style={local.lineText}>
+                <Text style={local.title}>Modo de la app</Text>
+                <Text style={local.sub}>
+                  Colores de las pantallas. Los de la consola, más abajo en
+                  Terminal.
+                </Text>
+              </View>
+            </View>
+            <View style={local.gap}>
+              <Segmented
+                value={appTheme}
+                onChange={chooseAppTheme}
+                options={APP_THEME_OPTIONS}
+              />
             </View>
           </View>
-          <View style={local.gap}>
-            <Segmented
-              value={appTheme}
-              onChange={chooseAppTheme}
-              options={APP_THEME_OPTIONS}
-            />
-          </View>
-        </View>
+          <Text style={local.subhead}>Terminal</Text>
+          <Item
+            icon="🎨"
+            title="Tema de color"
+            sub={`Colores de la consola · ${themeById(themeId).name}`}
+            onPress={() => setThemePicker(true)}
+          />
+          <Item
+            icon="🔤"
+            title="Fuente"
+            sub={fontName(fontId)}
+            onPress={() => setFontPicker(true)}
+          />
+          <Item
+            icon="⌨️"
+            title="Botonera de teclas"
+            sub="Añade, quita y ordena las teclas de encima del teclado"
+            onPress={onEditKeyBar}
+          />
+        </>
       ),
     },
     {
@@ -330,17 +351,12 @@ export function SettingsScreen({
       ),
     },
     {
-      id: 'import',
-      icon: '📦',
-      title: 'Importar',
-      body: <ImportSection store={store} />,
-    },
-    {
-      id: 'backup',
+      id: 'data',
       icon: '💾',
-      title: 'Copia de seguridad',
+      title: 'Copias e importación',
       body: (
         <>
+          <Text style={local.subheadFirst}>Copia de seguridad</Text>
           <Item
             icon="📤"
             title="Exportar copia cifrada"
@@ -353,33 +369,8 @@ export function SettingsScreen({
             sub="Añade lo que falte desde un fichero .lulossh (no borra nada)"
             onPress={pickBackup}
           />
-        </>
-      ),
-    },
-    {
-      id: 'terminal',
-      icon: '🖥️',
-      title: 'Terminal',
-      body: (
-        <>
-          <Item
-            icon="🎨"
-            title="Tema de color"
-            sub={`Colores de la consola · ${themeById(themeId).name}`}
-            onPress={() => setThemePicker(true)}
-          />
-          <Item
-            icon="🔤"
-            title="Fuente"
-            sub={fontName(fontId)}
-            onPress={() => setFontPicker(true)}
-          />
-          <Item
-            icon="⌨️"
-            title="Botonera de teclas"
-            sub="Añade, quita y ordena las teclas de encima del teclado"
-            onPress={onEditKeyBar}
-          />
+          <Text style={local.subhead}>Importar</Text>
+          <ImportSection store={store} />
         </>
       ),
     },
@@ -674,6 +665,25 @@ const local = StyleSheet.create({
   title: { color: colors.strong, fontSize: 16, fontWeight: '600' },
   sub: { color: colors.muted, marginTop: 2, fontSize: 13 },
   gap: { marginTop: 12, marginBottom: 6 },
+  subhead: {
+    color: colors.muted,
+    fontSize: 13,
+    fontWeight: '700',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+    marginTop: 16,
+    marginBottom: 8,
+    marginLeft: 4,
+  },
+  subheadFirst: {
+    color: colors.muted,
+    fontSize: 13,
+    fontWeight: '700',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+    marginBottom: 8,
+    marginLeft: 4,
+  },
   icon: { fontSize: 20, width: 28, textAlign: 'center' },
   chev: { color: colors.muted, fontSize: 22 },
   pressed: { backgroundColor: colors.surface2 },
