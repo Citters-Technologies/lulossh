@@ -56,10 +56,20 @@ interface Props {
   onTap?(): void;
   /** Texto seleccionado con pulsación larga; null si se descarta. */
   onSelection?(text: string | null): void;
+  /**
+   * Con varias terminales en pantalla, solo la activa recibe el teclado
+   * nativo (por defecto, sí).
+   */
+  inputEnabled?: boolean;
 }
 
 export const TerminalView = forwardRef<TerminalHandle, Props>(
-  ({ onReady, onResize, onInput, onTap, onSelection }, ref) => {
+  (
+    { onReady, onResize, onInput, onTap, onSelection, inputEnabled = true },
+    ref,
+  ) => {
+    const enabledRef = useRef(inputEnabled);
+    enabledRef.current = inputEnabled;
     const web = useRef<WebViewRef>(null);
 
     const run = (js: string) => web.current?.injectJavaScript(`${js};true;`);
@@ -88,14 +98,17 @@ export const TerminalView = forwardRef<TerminalHandle, Props>(
       if (!NATIVE_KEYBOARD) {
         return;
       }
-      const sub = sshEvents.addListener('termInput', (p: any) =>
-        inputRef.current(
-          appCursor.current ? toAppCursor(p.data) : p.data,
-        ),
-      );
+      const sub = sshEvents.addListener('termInput', (p: any) => {
+        if (enabledRef.current) {
+          inputRef.current(appCursor.current ? toAppCursor(p.data) : p.data);
+        }
+      });
       return () => {
         sub.remove();
-        Ssh.hideKeyboard(true);
+        // La vista de entrada es de todas: solo la suelta la que la usaba.
+        if (enabledRef.current) {
+          Ssh.hideKeyboard(true);
+        }
       };
     }, []);
 
@@ -109,7 +122,9 @@ export const TerminalView = forwardRef<TerminalHandle, Props>(
       if (msg.type === 'tap') {
         onTap?.();
       } else if (msg.type === 'focus') {
-        Ssh.showKeyboard();
+        if (enabledRef.current) {
+          Ssh.showKeyboard();
+        }
       } else if (msg.type === 'selection') {
         onSelection?.(msg.text ?? '');
       } else if (msg.type === 'selectionCleared') {

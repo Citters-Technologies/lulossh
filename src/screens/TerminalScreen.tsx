@@ -40,6 +40,9 @@ const FONT_MIN = 8;
 const FONT_MAX = 32;
 const FONT_DEFAULT = 14;
 
+/** Última preferencia de botonera visible/oculta (se comparte entre terminales). */
+let lastBarVisible = true;
+
 export function TerminalScreen({
   host,
   sessionId: initialId,
@@ -49,6 +52,9 @@ export function TerminalScreen({
   onOsDetected,
   inPane = false,
   onShowSide,
+  active = true,
+  onActivate,
+  keyboardPad = true,
 }: {
   host: Host;
   /**
@@ -71,7 +77,15 @@ export function TerminalScreen({
    * a mostrar (también el botón ☰ de las pestañas).
    */
   onShowSide?(): void;
+  /** Varias terminales en pantalla: esta es la que recibe el teclado. */
+  active?: boolean;
+  /** Toque en una terminal no activa: pasa a ser la activa. */
+  onActivate?(): void;
+  /** false: el hueco del teclado lo deja el contenedor (varias terminales). */
+  keyboardPad?: boolean;
 }) {
+  const activeRef = useRef(active);
+  activeRef.current = active;
   const showSideRef = useRef(onShowSide);
   showSideRef.current = onShowSide;
   const edgePan = useRef(
@@ -101,7 +115,14 @@ export function TerminalScreen({
       .then(v => setLayout(parseLayout(v)))
       .catch(() => {});
   }, []);
-  const [barVisible, setBarVisible] = useState(true);
+  // La botonera se recuerda entre sesiones y pestañas (mientras la app vive).
+  const [barVisible, setBarVisibleState] = useState(lastBarVisible);
+  const setBarVisible = (v: boolean | ((prev: boolean) => boolean)) =>
+    setBarVisibleState(prev => {
+      const next = typeof v === 'function' ? v(prev) : v;
+      lastBarVisible = next;
+      return next;
+    });
   /** null: sin selección activa; '' : pulsación larga sobre vacío (solo Pegar). */
   const [selection, setSelection] = useState<string | null>(null);
 
@@ -109,6 +130,12 @@ export function TerminalScreen({
   // botonera de teclas; con el teclado cerrado, abrir teclado y botonera.
   // (El teclado se cierra con el gesto/botón atrás de Android.)
   const onTap = async () => {
+    if (!activeRef.current) {
+      // Primer toque en otra terminal: solo activarla.
+      onActivate?.();
+      Ssh.showKeyboard();
+      return;
+    }
     // keyboardHeight puede quedar desfasado tras apagar la pantalla.
     if (keyboardHeight > 0 && Keyboard.isVisible()) {
       setBarVisible(v => !v);
@@ -174,6 +201,9 @@ export function TerminalScreen({
 
     Ssh.setVolumeKeysEnabled(true);
     const sub = sshEvents.addListener('volumeKey', (p: any) => {
+      if (!activeRef.current) {
+        return;
+      }
       const next = Math.min(
         FONT_MAX,
         Math.max(FONT_MIN, fontSize.current + (p.direction === 'up' ? 1 : -1)),
@@ -189,7 +219,9 @@ export function TerminalScreen({
       hintTimer.current = setTimeout(() => setFontHint(null), 1200);
     });
     return () => {
-      Ssh.setVolumeKeysEnabled(false);
+      if (activeRef.current) {
+        Ssh.setVolumeKeysEnabled(false);
+      }
       sub.remove();
       clearTimeout(hintTimer.current);
     };
@@ -523,7 +555,12 @@ export function TerminalScreen({
           </Text>
         </Pressable>
       </View>
-      <View style={[styles.body, { paddingBottom: keyboardHeight }]}>
+      <View
+        style={[
+          styles.body,
+          { paddingBottom: keyboardPad ? keyboardHeight : 0 },
+        ]}
+      >
         <TerminalView
           ref={term}
           onReady={onReady}
@@ -531,6 +568,7 @@ export function TerminalScreen({
           onInput={onInput}
           onTap={onTap}
           onSelection={setSelection}
+          inputEnabled={active}
         />
         {selection !== null && (
           <View style={styles.selBar}>
@@ -583,7 +621,7 @@ export function TerminalScreen({
             <Text style={styles.hintText}>{fontHint}</Text>
           </View>
         )}
-        {barVisible && (
+        {barVisible && active && (
           <KeyBar
             key={layout === DEFAULT_LAYOUT ? 'default' : 'custom'}
             layout={layout}

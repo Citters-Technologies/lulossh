@@ -3,6 +3,7 @@ import {
   Alert,
   AppState,
   BackHandler,
+  LayoutAnimation,
   PermissionsAndroid,
   Platform,
   StatusBar,
@@ -39,9 +40,17 @@ import {
   SIDE_WIDTH,
   useSplitLayout,
 } from './src/ui/SplitPanes';
+import {
+  MAX_PANES,
+  paneCount,
+  PaneLayout,
+  PaneSession,
+  Workspace,
+} from './src/ui/Workspace';
 
 const JUICE_PREF = 'juiceImport';
 const SIDE_PREF = 'splitSide';
+const PANES_PREF = 'paneLayout';
 
 const appStyles = StyleSheet.create({
   blank: { flex: 1, backgroundColor: colors.bg },
@@ -50,9 +59,13 @@ const appStyles = StyleSheet.create({
   hidden: { display: 'none' },
   side: {
     width: SIDE_WIDTH,
+    overflow: 'hidden',
     borderRightWidth: StyleSheet.hairlineWidth,
     borderRightColor: colors.surface2,
   },
+  // Plegado con animación (ancho 0) en vez de display:none.
+  sideCollapsed: { width: 0, borderRightWidth: 0 },
+  sideInner: { width: SIDE_WIDTH, flex: 1 },
 });
 
 type Route =
@@ -92,11 +105,66 @@ export default function App() {
       .then(v => setSideHidden(v === 'hidden'))
       .catch(() => {});
   }, []);
-  const toggleSide = () =>
+  const toggleSide = () => {
+    // El panel se desliza en lugar de aparecer de golpe.
+    LayoutAnimation.configureNext(
+      LayoutAnimation.create(220, 'easeInEaseOut', 'scaleX'),
+    );
     setSideHidden(h => {
       Ssh.prefSet(SIDE_PREF, h ? 'shown' : 'hidden').catch(() => {});
       return !h;
     });
+  };
+
+  // Tablet: hasta 4 terminales en pantalla. El teclado va al panel activo.
+  const [paneLayout, setPaneLayoutState] = useState<PaneLayout>('single');
+  const [panes, setPanes] = useState<(PaneSession | null)[]>(() =>
+    Array(MAX_PANES).fill(null),
+  );
+  const [activePane, setActivePane] = useState(0);
+  const panesRef = useRef(panes);
+  panesRef.current = panes;
+  const activePaneRef = useRef(activePane);
+  activePaneRef.current = activePane;
+  const splitRef = useRef(split);
+  splitRef.current = split;
+  useEffect(() => {
+    Ssh.prefGet(PANES_PREF)
+      .then(v => {
+        if (v === 'single' || v === 'cols' || v === 'rows' || v === 'grid') {
+          setPaneLayoutState(v);
+        }
+      })
+      .catch(() => {});
+  }, []);
+  const setPaneLayout = (l: PaneLayout) => {
+    setPaneLayoutState(l);
+    setActivePane(a => (a < paneCount(l) ? a : 0));
+    Ssh.prefSet(PANES_PREF, l).catch(() => {});
+  };
+  const anyPane = panes.some(Boolean);
+
+  /**
+   * Muestra una terminal. En tablet va al panel activo (o al que ya la
+   * enseña); en móvil es una pantalla completa.
+   */
+  const showTerminal = useCallback((t: PaneSession) => {
+    if (!splitRef.current) {
+      setRoute({ name: 'terminal', ...t });
+      return;
+    }
+    const cur = panesRef.current;
+    const at = cur.findIndex(x => x?.sessionId === t.sessionId);
+    if (at >= 0) {
+      setActivePane(at);
+    } else {
+      const i = activePaneRef.current;
+      setPanes(ps => ps.map((x, j) => (j === i ? t : x)));
+    }
+    setRoute({ name: 'hosts' });
+  }, []);
+  const closePane = (i: number) =>
+    setPanes(ps => ps.map((x, j) => (j === i ? null : x)));
   const setLocked = (v: boolean) => {
     if (v) {
       // La terminal se desmonta mientras está bloqueado: al volver, restaurar
@@ -142,18 +210,21 @@ export default function App() {
   const storeRef = useRef(store);
   storeRef.current = store;
 
-  const openLive = useCallback((s: LiveSession) => {
-    // El host puede haberse borrado: mostrar al menos el título.
-    const host: Host = hostsRef.current.find(h => h.id === s.hostId) ?? {
-      id: s.hostId ?? s.sessionId,
-      name: s.title,
-      host: '',
-      port: 22,
-      username: '',
-      auth: { type: 'password', password: '' },
-    };
-    setRoute({ name: 'terminal', host, sessionId: s.sessionId, resume: true });
-  }, []);
+  const openLive = useCallback(
+    (s: LiveSession) => {
+      // El host puede haberse borrado: mostrar al menos el título.
+      const host: Host = hostsRef.current.find(h => h.id === s.hostId) ?? {
+        id: s.hostId ?? s.sessionId,
+        name: s.title,
+        host: '',
+        port: 22,
+        username: '',
+        auth: { type: 'password', password: '' },
+      };
+      showTerminal({ host, sessionId: s.sessionId, resume: true });
+    },
+    [showTerminal],
+  );
 
   // Toque en la notificación de sesiones: abrir la sesión indicada.
   const checkPendingOpen = useCallback(async () => {
@@ -191,15 +262,15 @@ export default function App() {
     }
   }, [route, refreshLive]);
 
-  // En dos paneles la lista de sesiones está a la vista: mantenerla al día
+  // En tablet las pestañas de sesiones están a la vista: mantenerlas al día
   // (una sesión nueva aparece al terminar de conectar).
   useEffect(() => {
-    if (!split || route.name !== 'terminal') {
+    if (!split || !anyPane) {
       return;
     }
     const t = setInterval(refreshLive, 3000);
     return () => clearInterval(t);
-  }, [split, route.name, refreshLive]);
+  }, [split, anyPane, refreshLive]);
 
   // Al abrir: si JuiceSSH está instalado, ofrecer importar (hasta que se haga
   // o el usuario diga que no vuelva a preguntar).
@@ -295,12 +366,7 @@ export default function App() {
           useCount: (h.useCount ?? 0) + 1,
         })
         .catch(() => {});
-      setRoute({
-        name: 'terminal',
-        host: h,
-        sessionId: newId(),
-        resume: false,
-      });
+      showTerminal({ host: h, sessionId: newId(), resume: false });
     };
     const existing = live.filter(s => s.hostId === h.id);
     if (existing.length) {
@@ -383,7 +449,7 @@ export default function App() {
 
   // Dos paneles solo para la lista y la terminal; el resto (ajustes, editar
   // host…) ocupa toda la pantalla.
-  const paneOn = split && (route.name === 'hosts' || route.name === 'terminal');
+  const paneOn = split && route.name === 'hosts';
 
   let screen: React.ReactNode = null;
   switch (route.name) {
@@ -441,8 +507,6 @@ export default function App() {
           onOsDetected={os =>
             store.patchHost(route.host.id, { os }).catch(() => {})
           }
-          inPane={paneOn}
-          onShowSide={paneOn && sideHidden ? toggleSide : undefined}
         />
       );
       break;
@@ -453,42 +517,88 @@ export default function App() {
       <StatusBar barStyle={isLight ? 'dark-content' : 'light-content'} />
       {/* Bloqueado: no se pinta nada de la app (las sesiones siguen en nativo). */}
       {locked === false ? (
-        // Misma estructura en móvil y tablet para que la terminal no se
-        // desmonte (y reconecte) al girar la pantalla.
+        // Misma estructura siempre: las terminales no se desmontan (ni
+        // reconectan) al ir a Ajustes o al cambiar la distribución.
         <View style={paneOn ? appStyles.row : appStyles.fill}>
           <View
             style={
               paneOn
-                ? sideHidden && route.name === 'terminal'
-                  ? appStyles.hidden
-                  : appStyles.side
+                ? [
+                    appStyles.side,
+                    sideHidden && anyPane && appStyles.sideCollapsed,
+                  ]
                 : route.name === 'hosts'
                 ? appStyles.fill
                 : appStyles.hidden
             }
           >
-            {tabsView}
+            <View style={paneOn ? appStyles.sideInner : appStyles.fill}>
+              {tabsView}
+            </View>
           </View>
+          {split && (
+            <View style={paneOn ? appStyles.fill : appStyles.hidden}>
+              {anyPane ? (
+                <>
+                  <SessionTabs
+                    live={live}
+                    current={panes[activePane]?.sessionId ?? ''}
+                    currentTitle={panes[activePane]?.host.name ?? ''}
+                    onOpen={openLive}
+                    sideHidden={sideHidden}
+                    onToggleSide={toggleSide}
+                    layout={paneLayout}
+                    onLayoutChange={setPaneLayout}
+                    shown={panes
+                      .slice(0, paneCount(paneLayout))
+                      .map(x => x?.sessionId ?? '')
+                      .filter(Boolean)}
+                  />
+                  <Workspace
+                    layout={paneLayout}
+                    panes={panes}
+                    active={activePane}
+                    onActivate={setActivePane}
+                    renderPane={(i, pn, isActive) => (
+                      <TerminalScreen
+                        key={pn.sessionId}
+                        host={pn.host}
+                        sessionId={pn.sessionId}
+                        resume={pn.resume}
+                        onClose={() => closePane(i)}
+                        onHostKeyAccepted={fp =>
+                          store
+                            .patchHost(pn.host.id, { fingerprint: fp })
+                            .catch(() => {})
+                        }
+                        onOsDetected={os =>
+                          store.patchHost(pn.host.id, { os }).catch(() => {})
+                        }
+                        inPane
+                        active={isActive}
+                        onActivate={() => setActivePane(i)}
+                        keyboardPad={false}
+                        onShowSide={
+                          sideHidden && (i === 0 || i === 2)
+                            ? toggleSide
+                            : undefined
+                        }
+                      />
+                    )}
+                  />
+                </>
+              ) : (
+                <EmptyPane sessions={live.length} />
+              )}
+            </View>
+          )}
           <View
             style={
-              paneOn || route.name !== 'hosts'
+              !paneOn && route.name !== 'hosts'
                 ? appStyles.fill
                 : appStyles.hidden
             }
           >
-            {paneOn && route.name === 'terminal' && (
-              <SessionTabs
-                live={live}
-                current={route.sessionId}
-                currentTitle={route.host.name}
-                onOpen={openLive}
-                sideHidden={sideHidden}
-                onToggleSide={toggleSide}
-              />
-            )}
-            {paneOn && route.name === 'hosts' && (
-              <EmptyPane sessions={live.length} />
-            )}
             {screen}
           </View>
         </View>

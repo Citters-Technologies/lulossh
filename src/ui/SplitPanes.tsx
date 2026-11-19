@@ -9,6 +9,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LiveSession } from '../native/SshModule';
+import { PANE_LAYOUTS, PaneLayout } from './Workspace';
 import { colors } from './kit';
 import { Text } from './Text';
 
@@ -33,6 +34,9 @@ export function SessionTabs({
   onOpen,
   sideHidden,
   onToggleSide,
+  layout,
+  onLayoutChange,
+  shown,
 }: {
   live: LiveSession[];
   current: string;
@@ -42,8 +46,13 @@ export function SessionTabs({
   /** Panel lateral oculto: la terminal ocupa toda la pantalla. */
   sideHidden: boolean;
   onToggleSide(): void;
+  layout: PaneLayout;
+  onLayoutChange(l: PaneLayout): void;
+  /** Sesiones visibles en algún panel (se marcan). */
+  shown: string[];
 }) {
-  const tabs = live.some(s => s.sessionId === current)
+  const tabs =
+    !current || live.some(s => s.sessionId === current)
     ? live
     : [
         ...live,
@@ -66,6 +75,7 @@ export function SessionTabs({
       </Pressable>
       <ScrollView
         horizontal
+        style={local.tabsScroll}
         showsHorizontalScrollIndicator={false}
         contentContainerStyle={local.row}
       >
@@ -81,7 +91,13 @@ export function SessionTabs({
                 pressed && local.pressed,
               ]}
             >
-              <View style={[local.dot, on && local.dotOn]} />
+              <View
+                style={[
+                  local.dot,
+                  shown.includes(s.sessionId) && local.dotShown,
+                  on && local.dotOn,
+                ]}
+              />
               <Text
                 style={[local.tabText, on && local.tabTextOn]}
                 numberOfLines={1}
@@ -92,6 +108,27 @@ export function SessionTabs({
           );
         })}
       </ScrollView>
+      <View style={local.layouts}>
+        {PANE_LAYOUTS.map(l => (
+          <Pressable
+            key={l.id}
+            onPress={() => onLayoutChange(l.id)}
+            hitSlop={4}
+            accessibilityLabel={l.label}
+            style={({ pressed }) => [
+              local.layoutBtn,
+              l.id === layout && local.layoutOn,
+              pressed && local.pressed,
+            ]}
+          >
+            <Text
+              style={[local.layoutGlyph, l.id === layout && local.layoutGlyphOn]}
+            >
+              {l.glyph}
+            </Text>
+          </Pressable>
+        ))}
+      </View>
     </SafeAreaView>
   );
 }
@@ -125,6 +162,7 @@ const local = StyleSheet.create({
     borderBottomColor: colors.surface2,
   },
   barRow: { flexDirection: 'row', alignItems: 'center' },
+  tabsScroll: { flex: 1 },
   row: { paddingHorizontal: 8, paddingVertical: 6, gap: 6 },
   sideBtn: {
     marginLeft: 8,
@@ -149,7 +187,19 @@ const local = StyleSheet.create({
   tabOn: { backgroundColor: colors.surface2 },
   pressed: { opacity: 0.7 },
   dot: { width: 7, height: 7, borderRadius: 4, backgroundColor: colors.muted },
+  dotShown: { backgroundColor: colors.accent },
   dotOn: { backgroundColor: colors.brand },
+  layouts: { flexDirection: 'row', gap: 4, paddingHorizontal: 8 },
+  layoutBtn: {
+    width: 34,
+    height: 34,
+    borderRadius: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  layoutOn: { backgroundColor: colors.surface2 },
+  layoutGlyph: { color: colors.muted, fontSize: 20 },
+  layoutGlyphOn: { color: colors.strong },
   tabText: { color: colors.muted, fontSize: 14, flexShrink: 1 },
   tabTextOn: { color: colors.strong, fontWeight: '700' },
   empty: {
